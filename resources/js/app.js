@@ -54,6 +54,18 @@ document.addEventListener('click', (e) => {
         setCollapsed(document.body.dataset.collapsed !== 'true');
     }
 
+    // Sidebar submenu (Room Booking > floors): chevron toggles a smooth grid-rows animation
+    const sub = e.target.closest('[data-submenu-toggle]');
+    if (sub) {
+        const panel = document.getElementById(sub.getAttribute('aria-controls'));
+        const open = sub.getAttribute('aria-expanded') !== 'true';
+        sub.setAttribute('aria-expanded', String(open));
+        panel?.classList.toggle('grid-rows-[1fr]', open);
+        panel?.classList.toggle('grid-rows-[0fr]', !open);
+        panel?.toggleAttribute('inert', !open); // closed links must not be tabbable
+        sub.querySelector('[data-chevron]')?.classList.toggle('rotate-180', open);
+    }
+
     if (e.target.closest('[data-sidebar-toggle]')) {
         setSidebar(sidebar?.classList.contains('-translate-x-full'));
     }

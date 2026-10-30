@@ -27,6 +27,18 @@
     $initials = \Illuminate\Support\Str::of(Auth::user()->name)->explode(' ')->filter()->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('');
 
     // Class helpers (full literals so Tailwind can see them). "Collapsed" only applies on lg+.
+    // Floors submenu (Room Booking only). $sidebarFloors comes from the view composer in AppServiceProvider:
+    // [['floor' => 3, 'total' => 4, 'available' => 2], ...] built from the rooms table.
+    $floorList  = $sidebarFloors ?? collect();
+    $onBookings = request()->routeIs('bookings.index');
+    $curFloor   = ($onBookings && request()->filled('floor')) ? (string) request('floor') : null;
+    $keepQuery  = $onBookings ? request()->only(['search', 'status', 'room_type_id', 'date']) : []; // keep other filters
+    $floorUrl   = fn ($f = null) => route('bookings.index', array_filter(
+        array_merge($keepQuery, ['floor' => $f]),
+        fn ($v) => $v !== null && $v !== ''
+    ));
+    $floorsOpen = $curFloor !== null;   // stay open on load when a floor is selected
+
     $hid = 'lg:group-data-[collapsed=true]/sb:hidden';
     $ctr = 'lg:group-data-[collapsed=true]/sb:justify-center lg:group-data-[collapsed=true]/sb:px-0';
 @endphp
@@ -58,6 +70,49 @@
         <ul class="space-y-1">
             @foreach ($browse as [$label, $route, $pattern, $icon])
                 @php $active = request()->routeIs($pattern); @endphp
+                @if ($route === 'bookings.index')
+                {{-- Room Booking: link + chevron that expands the floors submenu --}}
+                <li>
+                    <div class="group flex items-center rounded-xl transition {{ $active ? 'bg-primary text-white shadow-md shadow-primary/25' : 'text-slate-600 hover:bg-tint hover:text-primary' }}">
+                        <a href="{{ route($route) }}" title="{{ $label }}" @if($active) aria-current="page" @endif
+                           class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium {{ $ctr }}">
+                            <x-icon :name="$icon" class="size-5 shrink-0 {{ $active ? '' : 'text-slate-400 group-hover:text-primary' }}" />
+                            <span class="truncate {{ $hid }}">{{ $label }}</span>
+                        </a>
+                        <button type="button" data-submenu-toggle aria-controls="floorMenu" aria-expanded="{{ $floorsOpen ? 'true' : 'false' }}"
+                                aria-label="Show floors"
+                                class="icon-btn mr-1 !size-8 shrink-0 {{ $active ? 'text-white/80 hover:bg-white/15' : 'text-slate-400 hover:bg-tint-2 hover:text-primary' }} {{ $hid }}">
+                            <x-icon name="chevron-down" data-chevron class="size-4 transition-transform duration-200 {{ $floorsOpen ? 'rotate-180' : '' }}" />
+                        </button>
+                    </div>
+
+                    {{-- grid-rows 0fr -> 1fr gives a smooth height animation without measuring in JS --}}
+                    <div id="floorMenu" @unless($floorsOpen) inert @endunless
+                         class="grid transition-[grid-template-rows] duration-200 ease-out {{ $floorsOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]' }} {{ $hid }}">
+                        <ul class="ml-6 min-h-0 space-y-0.5 overflow-hidden border-l border-slate-200 pl-3" aria-label="Filter by floor">
+                            <li class="pt-1">
+                                <a href="{{ $floorUrl() }}" @if($onBookings && $curFloor === null) aria-current="true" @endif
+                                   class="flex items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition {{ ($onBookings && $curFloor === null) ? 'bg-tint font-semibold text-primary' : 'text-slate-600 hover:bg-tint/60 hover:text-primary' }}">
+                                    All Floors
+                                </a>
+                            </li>
+                            @foreach ($floorList as $fl)
+                                @php $isFloor = $curFloor !== null && $curFloor === (string) $fl['floor']; @endphp
+                                <li>
+                                    <a href="{{ $floorUrl($fl['floor']) }}" @if($isFloor) aria-current="true" @endif
+                                       class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition {{ $isFloor ? 'bg-tint font-semibold text-primary' : 'text-slate-600 hover:bg-tint/60 hover:text-primary' }}">
+                                        <span>Floor {{ $fl['floor'] }}</span>
+                                        <span title="{{ $fl['available'] }} of {{ $fl['total'] }} rooms available today"
+                                              class="rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $fl['available'] > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">{{ $fl['available'] }}</span>
+                                    </a>
+                                </li>
+                            @endforeach
+                            <li class="pb-1" aria-hidden="true"></li>
+                        </ul>
+                    </div>
+                </li>
+                @else
+                @php $active = request()->routeIs($pattern); @endphp
                 <li>
                     <a href="{{ route($route) }}" title="{{ $label }}" @if($active) aria-current="page" @endif
                        class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition {{ $ctr }} {{ $active ? 'bg-primary text-white shadow-md shadow-primary/25' : 'text-slate-600 hover:bg-tint hover:text-primary' }}">
@@ -65,6 +120,7 @@
                         <span class="truncate {{ $hid }}">{{ $label }}</span>
                     </a>
                 </li>
+                @endif
             @endforeach
         </ul>
 

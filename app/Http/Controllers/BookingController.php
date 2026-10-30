@@ -49,12 +49,13 @@ class BookingController extends Controller
         // Status counts are for the whole hotel, before filters are applied.
         $counts = $cards->countBy(fn ($c) => $c['state']['key'])->all();
 
-        // Filters
+        // Filters. Floor must be a whole number (sidebar + dropdown both send ?floor=N); anything else is ignored.
         $search = trim((string) $request->query('search', ''));
+        $floor  = ctype_digit((string) $request->query('floor', '')) ? (int) $request->query('floor') : null;
         $cards = $cards
             ->when($search !== '', fn ($c) => $c->filter(fn ($i) => Str::contains($i['room']->room_number, $search, true)))
             ->when($request->filled('room_type_id'), fn ($c) => $c->filter(fn ($i) => (string) $i['room']->room_type_id === (string) $request->query('room_type_id')))
-            ->when($request->filled('floor'), fn ($c) => $c->filter(fn ($i) => (string) $i['room']->floor === (string) $request->query('floor')))
+            ->when($floor !== null, fn ($c) => $c->filter(fn ($i) => (int) $i['room']->floor === $floor))
             ->when($request->filled('status'), fn ($c) => $c->filter(fn ($i) => $i['state']['key'] === $request->query('status')))
             ->values();
 
@@ -70,6 +71,7 @@ class BookingController extends Controller
             'date'      => $date,
             'roomTypes' => RoomType::orderBy('type_name')->get(),
             'floors'    => $rooms->pluck('floor')->unique()->sort()->values(),
+            'activeFloor' => $floor,              // active floor filter (or null)
             'allRooms'  => $rooms->keyBy('id'),   // used to re-open the modal after a validation error
             'bookings'  => $bookings,
         ]);

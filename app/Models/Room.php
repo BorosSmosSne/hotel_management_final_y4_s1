@@ -21,6 +21,28 @@ class Room extends Model
         return $this->belongsTo(RoomType::class);
     }
 
+    /**
+     * Distinct floors from the rooms table with room counts, for the sidebar floors menu.
+     * "available" uses the same rule as statusOn(): status "available" and no active booking covering the day.
+     *
+     * @return \Illuminate\Support\Collection<int, array{floor:int,total:int,available:int}>
+     */
+    public static function floorSummary(?\Carbon\Carbon $date = null): \Illuminate\Support\Collection
+    {
+        $date ??= today();
+        $booked = Booking::active()->covering($date)->pluck('room_id')->flip();
+
+        return static::query()->get(['id', 'floor', 'status'])
+            ->groupBy('floor')
+            ->sortKeys()
+            ->map(fn ($rooms, $floor) => [
+                'floor'     => (int) $floor,
+                'total'     => $rooms->count(),
+                'available' => $rooms->filter(fn ($r) => $r->status === 'available' && ! $booked->has($r->id))->count(),
+            ])
+            ->values();
+    }
+
     public function bookings(){
         return $this->hasMany(Booking::class);
     }

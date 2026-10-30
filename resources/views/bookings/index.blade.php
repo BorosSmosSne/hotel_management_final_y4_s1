@@ -88,7 +88,7 @@
         <div>
             <h2 id="gridTitle" class="text-lg font-bold">Rooms</h2>
             <p class="text-sm text-slate-500">
-                Showing {{ $cards->count() }} of {{ $totalRooms }} rooms for <b class="text-ink">{{ $date->isToday() ? 'today' : $date->format('d M Y') }}</b>.
+                Showing {{ $cards->count() }} of {{ $totalRooms }} rooms @if ($activeFloor !== null)on <b class="text-ink">Floor {{ $activeFloor }}</b> @endif for <b class="text-ink">{{ $date->isToday() ? 'today' : $date->format('d M Y') }}</b>.
                 Click a green room to book it.
             </p>
         </div>
@@ -152,8 +152,8 @@
             @if ($isAvailable) </button> @else </div> @endif
         @empty
             <div class="col-span-full rounded-2xl bg-tint px-6 py-14 text-center text-slate-500">
-                <p class="font-medium text-ink">No rooms match these filters.</p>
-                <p class="mt-1 text-sm">Try another status, type or floor, or <a href="{{ route('bookings.index') }}" class="font-semibold text-primary hover:underline">reset the filters</a>.</p>
+                <p class="font-medium text-ink">{{ $activeFloor !== null ? 'No rooms on this floor' : 'No rooms match these filters.' }}</p>
+                <p class="mt-1 text-sm">Try another status, type or floor, or <a href="{{ route('bookings.index') }}" class="font-semibold text-primary hover:underline">show all floors</a>.</p>
             </div>
         @endforelse
     </div>

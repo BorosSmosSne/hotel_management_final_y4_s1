@@ -14,13 +14,16 @@
     // Sidebar menu: label, route, active pattern, icon
     $browse = [
         ['Dashboard',  'dashboard',        'dashboard',    'grid'],
+        ['Room Booking', 'bookings.index', 'bookings.*',   'calendar'],
         ['Rooms',      'rooms.index',      'rooms.*',      'door'],
         ['Room Types', 'room-types.index', 'room-types.*', 'bed'],
     ];
     $quick = [
         ['Add Room',      'rooms.create',      'plus'],
-        ['Add Room Type', 'room-types.create', 'plus'],
     ];
+    if (Auth::user()->isAdmin()) {
+        $quick[] = ['Add Room Type', 'room-types.create', 'plus'];
+    }
     $initials = \Illuminate\Support\Str::of(Auth::user()->name)->explode(' ')->filter()->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('');
 
     // Class helpers (full literals so Tailwind can see them). "Collapsed" only applies on lg+.
@@ -83,7 +86,9 @@
     <div class="shrink-0 border-t border-slate-100 p-4">
         <div class="flex items-center gap-3 {{ $ctr }}">
             <span class="grid size-9 shrink-0 place-items-center rounded-full bg-tint-2 text-sm font-bold text-primary" aria-hidden="true" title="{{ Auth::user()->name }}">{{ $initials }}</span>
-            <span class="min-w-0 flex-1 truncate text-sm font-semibold {{ $hid }}">{{ Auth::user()->name }}</span>
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold {{ $hid }}">{{ Auth::user()->name }}
+                <span class="block text-xs font-normal capitalize text-slate-500">{{ Auth::user()->role }}</span>
+            </span>
         </div>
         <form action="{{ route('logout') }}" method="POST" class="mt-3">
             @csrf
@@ -118,6 +123,13 @@
             </div>
         @endif
 
+        @if (session('error'))
+            <div data-flash role="alert" class="mb-5 flex items-center justify-between gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-800 ring-1 ring-red-200">
+                <span class="flex items-center gap-2"><x-icon name="alert" class="size-4" />{{ session('error') }}</span>
+                <button type="button" data-dismiss aria-label="Dismiss" class="icon-btn !size-7 text-red-700 hover:bg-red-100"><x-icon name="x" class="size-4" /></button>
+            </div>
+        @endif
+
         @yield('content')
     </main>
 @endif
@@ -149,7 +161,7 @@
         </p>
         <form method="dialog" class="mt-6 flex justify-end gap-3">
             <button class="btn btn-soft">Cancel</button>
-            <button type="button" data-dialog-confirm class="btn btn-danger"><x-icon name="trash" class="size-4" />Yes, delete</button>
+            <button type="button" data-dialog-confirm class="btn btn-danger"><x-icon name="trash" class="size-4" /><span data-dialog-confirm-label>Yes, delete</span></button>
         </form>
     </div>
 </dialog>

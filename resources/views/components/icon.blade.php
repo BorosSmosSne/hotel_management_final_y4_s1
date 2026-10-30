@@ -31,6 +31,9 @@
         'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
         'chevrons-left' => '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
         'chevrons-right' => '<path d="m6 17 5-5-5-5M13 17l5-5-5-5"/>',
+        'calendar' => '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+        'login' => '<path d="m10 17 5-5-5-5M15 12H3M12 3h7a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-7"/>',
+        'ban' => '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
         'save' => '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
     ];
 @endphp

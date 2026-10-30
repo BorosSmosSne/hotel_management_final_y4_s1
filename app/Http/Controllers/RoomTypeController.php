@@ -4,9 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\RoomType;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class RoomTypeController extends Controller
+class RoomTypeController extends Controller implements HasMiddleware
 {
+    /**
+     * Room types carry the nightly price, so only admins may create, edit or delete them.
+     * Staff can still view the list (index).
+     */
+    public static function middleware(): array
+    {
+        return [new Middleware('role:admin', except: ['index'])];
+    }
+
     public function index(Request $request)
     {
         $roomTypes = RoomType::when($request->search, function ($q, $search) {

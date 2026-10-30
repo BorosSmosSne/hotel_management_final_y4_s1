@@ -4,7 +4,9 @@
 
 <x-page-hero eyebrow="Pricing and capacity" title="Room Types" subtitle="Configure room categories, nightly rates and guest capacity.">
     <x-slot:actions>
-        <a href="{{ route('room-types.create') }}" class="btn btn-white"><x-icon name="plus" class="size-5" />Add Room Type</a>
+        @if (auth()->user()->isAdmin())
+            <a href="{{ route('room-types.create') }}" class="btn btn-white"><x-icon name="plus" class="size-5" />Add Room Type</a>
+        @endif
     </x-slot:actions>
 </x-page-hero>
 

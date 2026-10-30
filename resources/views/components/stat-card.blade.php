@@ -6,6 +6,8 @@
         'green' => 'bg-emerald-50 text-emerald-600',
         'red' => 'bg-red-50 text-red-600',
         'amber' => 'bg-amber-50 text-amber-600',
+        'orange' => 'bg-orange-50 text-orange-600',
+        'slate' => 'bg-slate-100 text-slate-500',
     ];
 @endphp
 <div class="card flex items-start justify-between gap-3 p-5">

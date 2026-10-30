@@ -31,6 +31,7 @@
                         <td class="px-6 py-4"><span class="chip bg-tint text-primary"><x-icon name="user" class="size-3.5" />{{ $type->capacity }} {{ $type->capacity == 1 ? 'guest' : 'guests' }}</span></td>
                         <td class="px-6 py-4 font-medium">{{ $type->room_count ?? '—' }}</td>
                         <td class="px-6 py-4">
+                            @if (auth()->user()->isAdmin())
                             <div class="flex items-center justify-end gap-2">
                                 <a href="{{ route('room-types.edit', $type) }}" class="icon-btn bg-tint text-primary hover:bg-tint-2" aria-label="Edit {{ $type->type_name }}"><x-icon name="pencil" class="size-4" /></a>
                                 <form action="{{ route('room-types.destroy', $type) }}" method="POST" class="inline"
@@ -43,13 +44,16 @@
                                     <button class="icon-btn bg-red-50 text-red-600 hover:bg-red-100" aria-label="Delete {{ $type->type_name }}"><x-icon name="trash" class="size-4" /></button>
                                 </form>
                             </div>
+                            @else
+                                <p class="text-right text-xs text-slate-400">Admin only</p>
+                            @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
                         <td colspan="6" class="px-6 py-14 text-center text-slate-500">
                             <p class="font-medium text-ink">No room types found.</p>
-                            <p class="mt-1 text-sm">Try a different search, or <a href="{{ route('room-types.create') }}" class="font-semibold text-primary hover:underline">add a room type</a>.</p>
+                            <p class="mt-1 text-sm">Try a different search, @if (auth()->user()->isAdmin())or <a href="{{ route('room-types.create') }}" class="font-semibold text-primary hover:underline">add a room type</a>@endif.</p>
                         </td>
                     </tr>
                 @endforelse

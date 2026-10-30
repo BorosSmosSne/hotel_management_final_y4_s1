@@ -25,16 +25,35 @@ dialog?.querySelector('[data-dialog-confirm]')?.addEventListener('click', () => 
 });
 dialog?.addEventListener('close', () => { pendingForm = null; });
 
-// 2) Click helpers
+// 2) Left side menu (off-canvas on mobile, always visible on lg+)
+const sidebar = document.getElementById('sidebar');
+const backdrop = document.getElementById('sidebarBackdrop');
+function setSidebar(open) {
+    if (!sidebar) return;
+    sidebar.classList.toggle('-translate-x-full', !open);
+    backdrop?.classList.toggle('hidden', !open);
+    document.querySelectorAll('[data-sidebar-toggle][aria-expanded]')
+        .forEach((b) => b.setAttribute('aria-expanded', String(open)));
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSidebar(false); });
+
+// Desktop: collapse to an icon rail / expand again (remembered in localStorage).
+function setCollapsed(collapsed) {
+    document.body.dataset.collapsed = String(collapsed);
+    try { localStorage.setItem('sidebar-collapsed', collapsed ? '1' : '0'); } catch (e) {}
+}
+
+// 3) Click helpers
 document.addEventListener('click', (e) => {
     const dismiss = e.target.closest('[data-dismiss]');
     if (dismiss) dismiss.closest('[data-flash]')?.remove();
 
-    const nav = e.target.closest('[data-nav-toggle]');
-    if (nav) {
-        const menu = document.getElementById('mobileNav');
-        const open = menu.classList.toggle('hidden') === false;
-        nav.setAttribute('aria-expanded', String(open));
+    if (e.target.closest('[data-sidebar-collapse]')) {
+        setCollapsed(document.body.dataset.collapsed !== 'true');
+    }
+
+    if (e.target.closest('[data-sidebar-toggle]')) {
+        setSidebar(sidebar?.classList.contains('-translate-x-full'));
     }
 
     const pw = e.target.closest('[data-toggle-password]');
@@ -48,7 +67,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// 3) Live preview: <span data-bind="field_name"> mirrors the form field with that name.
+// 4) Live preview: <span data-bind="field_name"> mirrors the form field with that name.
 //    Optional: data-bind-data="price" (read option[data-price]), data-format="money", data-empty="…".
 document.querySelectorAll('[data-preview-root]').forEach((root) => {
     root.querySelectorAll('[data-bind]').forEach((el) => {

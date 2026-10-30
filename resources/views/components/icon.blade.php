@@ -28,6 +28,9 @@
         'users' => '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5A6.5 6.5 0 0 1 21.5 20"/>',
         'chevron-left' => '<path d="m15 6-6 6 6 6"/>',
         'chevron-right' => '<path d="m9 6 6 6-6 6"/>',
+        'chevron-down' => '<path d="m6 9 6 6 6-6"/>',
+        'chevrons-left' => '<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
+        'chevrons-right' => '<path d="m6 17 5-5-5-5M13 17l5-5-5-5"/>',
         'save' => '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
     ];
 @endphp

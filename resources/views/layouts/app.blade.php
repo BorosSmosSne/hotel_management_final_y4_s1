@@ -6,56 +6,105 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="flex min-h-full flex-col bg-canvas font-sans text-ink antialiased">
+<body class="group/sb flex min-h-full flex-col bg-canvas font-sans text-ink antialiased">
+<script>try{document.body.dataset.collapsed=localStorage.getItem('sidebar-collapsed')==='1'?'true':'false'}catch(e){}</script>
 
 @auth
-<header class="sticky top-0 z-30 bg-white/90 shadow-sm shadow-primary/5 backdrop-blur">
-    <div class="mx-auto flex h-16 max-w-none items-center gap-6 px-4 sm:px-6 lg:px-8">
-        <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 text-lg font-bold text-primary">
-            <span class="grid size-9 place-items-center rounded-xl bg-primary text-white"><x-icon name="building" class="size-5" /></span>
-            Grand Hotel
+@php
+    // Sidebar menu: label, route, active pattern, icon
+    $browse = [
+        ['Dashboard',  'dashboard',        'dashboard',    'grid'],
+        ['Rooms',      'rooms.index',      'rooms.*',      'door'],
+        ['Room Types', 'room-types.index', 'room-types.*', 'bed'],
+    ];
+    $quick = [
+        ['Add Room',      'rooms.create',      'plus'],
+        ['Add Room Type', 'room-types.create', 'plus'],
+    ];
+    $initials = \Illuminate\Support\Str::of(Auth::user()->name)->explode(' ')->filter()->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('');
+
+    // Class helpers (full literals so Tailwind can see them). "Collapsed" only applies on lg+.
+    $hid = 'lg:group-data-[collapsed=true]/sb:hidden';
+    $ctr = 'lg:group-data-[collapsed=true]/sb:justify-center lg:group-data-[collapsed=true]/sb:px-0';
+@endphp
+
+{{-- Left side menu --}}
+<aside id="sidebar" aria-label="Sidebar"
+       class="fixed inset-y-0 left-0 z-40 flex w-64 overflow-hidden whitespace-nowrap -translate-x-full flex-col bg-white shadow-xl shadow-primary/10 transition-[transform,width] duration-200 lg:translate-x-0 lg:shadow-none lg:ring-1 lg:ring-slate-900/5 lg:group-data-[collapsed=true]/sb:w-20">
+
+    <div class="flex h-16 shrink-0 items-center justify-between px-5 lg:group-data-[collapsed=true]/sb:justify-center lg:group-data-[collapsed=true]/sb:gap-1 lg:group-data-[collapsed=true]/sb:px-0">
+        <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-2.5 whitespace-nowrap text-lg font-bold text-primary" title="Grand Hotel">
+            <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-white"><x-icon name="building" class="size-5" /></span>
+            <span class="{{ $hid }}">Grand Hotel</span>
         </a>
 
-        <nav class="hidden items-center gap-1 md:flex" aria-label="Main">
-            <a href="{{ route('dashboard') }}"
-               class="rounded-lg px-3 py-2 text-sm font-medium transition {{ request()->routeIs('dashboard') ? 'bg-tint text-primary' : 'text-slate-600 hover:bg-tint/60' }}"
-               @if(request()->routeIs('dashboard')) aria-current="page" @endif>Dashboard</a>
-            <a href="{{ route('rooms.index') }}"
-               class="rounded-lg px-3 py-2 text-sm font-medium transition {{ request()->routeIs('rooms.*') ? 'bg-tint text-primary' : 'text-slate-600 hover:bg-tint/60' }}"
-               @if(request()->routeIs('rooms.*')) aria-current="page" @endif>Rooms</a>
-            <a href="{{ route('room-types.index') }}"
-               class="rounded-lg px-3 py-2 text-sm font-medium transition {{ request()->routeIs('room-types.*') ? 'bg-tint text-primary' : 'text-slate-600 hover:bg-tint/60' }}"
-               @if(request()->routeIs('room-types.*')) aria-current="page" @endif>Room Types</a>
-        </nav>
+        {{-- mobile: close --}}
+        <button type="button" data-sidebar-toggle aria-label="Close menu" class="icon-btn text-slate-500 hover:bg-tint lg:hidden"><x-icon name="x" /></button>
 
-        <div class="ml-auto hidden items-center gap-3 md:flex">
-            <span class="grid size-9 place-items-center rounded-full bg-tint-2 text-sm font-bold text-primary" aria-hidden="true">
-                {{ \Illuminate\Support\Str::of(Auth::user()->name)->explode(' ')->filter()->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('') }}
-            </span>
-            <span class="text-sm font-semibold">{{ Auth::user()->name }}</span>
-            <form action="{{ route('logout') }}" method="POST">
-                @csrf
-                <button class="btn btn-soft !px-3 !py-2"><x-icon name="logout" class="size-4" />Logout</button>
-            </form>
-        </div>
+        {{-- desktop: collapse (shown when expanded) --}}
+        <button type="button" data-sidebar-collapse aria-expanded="true" aria-label="Collapse sidebar" title="Collapse sidebar"
+                class="icon-btn !size-7 shrink-0 text-slate-400 hover:bg-tint hover:text-primary max-lg:hidden {{ $hid }}"><x-icon name="chevrons-left" class="!size-4" /></button>
 
-        <button type="button" data-nav-toggle aria-expanded="false" aria-controls="mobileNav" aria-label="Toggle menu"
-                class="icon-btn ml-auto bg-tint text-primary md:hidden"><x-icon name="menu" /></button>
+        {{-- desktop: expand (shown next to the logo when collapsed) --}}
+        <button type="button" data-sidebar-collapse aria-expanded="false" aria-label="Expand sidebar" title="Expand sidebar"
+                class="icon-btn hidden !size-6 shrink-0 text-slate-400 hover:bg-tint hover:text-primary lg:group-data-[collapsed=true]/sb:grid"><x-icon name="chevrons-right" class="!size-4" /></button>
     </div>
 
-    <div id="mobileNav" class="hidden border-t border-slate-100 px-4 pb-4 pt-2 md:hidden">
-        <a href="{{ route('dashboard') }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium {{ request()->routeIs('dashboard') ? 'bg-tint text-primary' : 'text-slate-600' }}">Dashboard</a>
-        <a href="{{ route('rooms.index') }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium {{ request()->routeIs('rooms.*') ? 'bg-tint text-primary' : 'text-slate-600' }}">Rooms</a>
-        <a href="{{ route('room-types.index') }}" class="block rounded-lg px-3 py-2.5 text-sm font-medium {{ request()->routeIs('room-types.*') ? 'bg-tint text-primary' : 'text-slate-600' }}">Room Types</a>
-        <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-            <span class="text-sm font-semibold">{{ Auth::user()->name }}</span>
-            <form action="{{ route('logout') }}" method="POST">
-                @csrf
-                <button class="btn btn-soft !px-3 !py-2">Logout</button>
-            </form>
+    <nav class="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label="Main">
+        <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 {{ $hid }}">Browse</p>
+        <ul class="space-y-1">
+            @foreach ($browse as [$label, $route, $pattern, $icon])
+                @php $active = request()->routeIs($pattern); @endphp
+                <li>
+                    <a href="{{ route($route) }}" title="{{ $label }}" @if($active) aria-current="page" @endif
+                       class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition {{ $ctr }} {{ $active ? 'bg-primary text-white shadow-md shadow-primary/25' : 'text-slate-600 hover:bg-tint hover:text-primary' }}">
+                        <x-icon :name="$icon" class="size-5 shrink-0 {{ $active ? '' : 'text-slate-400 group-hover:text-primary' }}" />
+                        <span class="truncate {{ $hid }}">{{ $label }}</span>
+                    </a>
+                </li>
+            @endforeach
+        </ul>
+
+        <p class="mt-8 px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 {{ $hid }}">Quick actions</p>
+        <hr class="mx-2 my-4 hidden border-slate-100 lg:group-data-[collapsed=true]/sb:block">
+        <ul class="space-y-1">
+            @foreach ($quick as [$label, $route, $icon])
+                <li>
+                    <a href="{{ route($route) }}" title="{{ $label }}"
+                       class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-tint hover:text-primary {{ $ctr }}">
+                        <span class="grid size-5 shrink-0 place-items-center rounded-md bg-tint-2 text-primary"><x-icon :name="$icon" class="size-3.5" /></span>
+                        <span class="truncate {{ $hid }}">{{ $label }}</span>
+                    </a>
+                </li>
+            @endforeach
+        </ul>
+    </nav>
+
+    <div class="shrink-0 border-t border-slate-100 p-4">
+        <div class="flex items-center gap-3 {{ $ctr }}">
+            <span class="grid size-9 shrink-0 place-items-center rounded-full bg-tint-2 text-sm font-bold text-primary" aria-hidden="true" title="{{ Auth::user()->name }}">{{ $initials }}</span>
+            <span class="min-w-0 flex-1 truncate text-sm font-semibold {{ $hid }}">{{ Auth::user()->name }}</span>
         </div>
+        <form action="{{ route('logout') }}" method="POST" class="mt-3">
+            @csrf
+            <button class="btn btn-soft w-full !py-2 lg:group-data-[collapsed=true]/sb:!px-0" title="Logout" aria-label="Logout"><x-icon name="logout" class="size-4" /><span class="{{ $hid }}">Logout</span></button>
+        </form>
     </div>
-</header>
+</aside>
+
+{{-- Mobile backdrop --}}
+<div id="sidebarBackdrop" data-sidebar-toggle class="fixed inset-0 z-30 hidden bg-slate-900/40 backdrop-blur-sm lg:hidden" aria-hidden="true"></div>
+
+<div class="flex min-h-screen flex-1 flex-col transition-[padding] duration-200 lg:pl-64 lg:group-data-[collapsed=true]/sb:pl-20">
+    {{-- Mobile top bar --}}
+    <header class="sticky top-0 z-20 flex h-16 items-center gap-3 bg-white/90 px-4 shadow-sm shadow-primary/5 backdrop-blur lg:hidden">
+        <button type="button" data-sidebar-toggle aria-expanded="false" aria-controls="sidebar" aria-label="Open menu"
+                class="icon-btn bg-tint text-primary"><x-icon name="menu" /></button>
+        <a href="{{ route('dashboard') }}" class="flex items-center gap-2 font-bold text-primary">
+            <span class="grid size-8 place-items-center rounded-lg bg-primary text-white"><x-icon name="building" class="size-4" /></span>
+            Grand Hotel
+        </a>
+    </header>
 @endauth
 
 @hasSection('bare')
@@ -104,6 +153,7 @@
         </form>
     </div>
 </dialog>
+</div>
 @endauth
 
 </body>

@@ -6,7 +6,8 @@ use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\Room;
 use App\Models\RoomType;
-use App\Services\RoomStatusService;
+use App\Services\HousekeepingService;
+use App\Support\HotelSettings;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class BookingController extends Controller
     /* =========================================================
      |  Room Booking page
      * ========================================================= */
-    public function index(Request $request, RoomStatusService $status)
+    public function index(Request $request)
     {
         Gate::authorize('viewAny', Booking::class);
 
@@ -36,7 +37,7 @@ class BookingController extends Controller
 
         // Every room + the active booking (if any) that covers the chosen day.
         $rooms    = Room::with('roomType')->orderBy('floor')->orderBy('room_number')->get();
-        $current  = $status->bookingsOn($date);   // the booking that decides each room's status (RoomStatusService)
+        $current  = Booking::active()->covering($date)->get()->keyBy('room_id');
         $upcoming = Booking::active()
             ->where('check_in', '>', $date->toDateString())
             ->orderBy('check_in')->get()
@@ -44,12 +45,12 @@ class BookingController extends Controller
 
         $cards = $rooms->map(fn (Room $room) => [
             'room'  => $room,
-            'state' => $status->describe($room, $current->get($room->id)),
+            'state' => $room->statusOn($current->get($room->id)),
             'next'  => $upcoming->get($room->id),
         ]);
 
         // Status counts are for the whole hotel, before filters are applied.
-        $counts = $status->summarise($cards->pluck('state.key'));
+        $counts = $cards->countBy(fn ($c) => $c['state']['key'])->all();
 
         // Filters. Floor must be a whole number (sidebar + dropdown both send ?floor=N); anything else is ignored.
         $search = trim((string) $request->query('search', ''));
@@ -117,8 +118,12 @@ class BookingController extends Controller
             if ($room->status === 'maintenance') {
                 throw ValidationException::withMessages(['room_id' => "Room {$room->room_number} is under maintenance and cannot be booked."]);
             }
-            // No 'occupied' check here: a guest checked in today must not stop a booking for later dates.
-            // assertCapacityAndFree() below rejects any stay that overlaps an active booking.
+            if ($room->status === 'cleaning') {
+                throw ValidationException::withMessages(['room_id' => "Room {$room->room_number} is being cleaned and cannot be booked yet."]);
+            }
+            if ($room->status === 'occupied') {
+                throw ValidationException::withMessages(['room_id' => "Room {$room->room_number} is marked as occupied and cannot be booked."]);
+            }
 
             $this->assertCapacityAndFree($room, (int) $data['guests'], $in, $out);
 
@@ -133,6 +138,8 @@ class BookingController extends Controller
 
             $nights = Booking::nightsBetween($in, $out);
             $price  = (float) $room->roomType->price_per_night;      // server-side price only
+            $taxRate = HotelSettings::taxRate();                     // snapshot: later changes in Settings never alter this booking
+            $cost    = Booking::priceBreakdown($nights, $price, $taxRate);
 
             return Booking::create([
                 'room_id'         => $room->id,
@@ -147,7 +154,9 @@ class BookingController extends Controller
                 'check_out'       => $out,
                 'nights'          => $nights,
                 'price_per_night' => $price,
-                'total_price'     => round($nights * $price, 2),
+                'tax_rate'        => $taxRate,
+                'tax_amount'      => $cost['tax_amount'],
+                'total_price'     => $cost['total'],
                 'status'          => Booking::CONFIRMED,
             ]);
         });
@@ -155,13 +164,14 @@ class BookingController extends Controller
         $booking->load('room');
 
         return back()->with('success', sprintf(
-            'Room %s booked for %s: %s to %s (%d %s), total $%s.',
+            'Room %s booked for %s: %s to %s (%d %s), total %s%s.',
             $booking->room->room_number,
             $booking->guest_name,
             $booking->check_in->format('d M'),
             $booking->check_out->format('d M Y'),
             $booking->nights,
             Str::plural('night', $booking->nights),
+            HotelSettings::currency(),
             number_format((float) $booking->total_price, 2)
         ));
     }
@@ -177,28 +187,17 @@ class BookingController extends Controller
             return back()->with('error', 'This guest can only be checked in during the stay (from the arrival date).');
         }
 
-        $blocked = DB::transaction(function () use ($booking) {
-            // Same row lock as store(), so check-in and a maintenance switch cannot race.
-            $room = Room::whereKey($booking->room_id)->lockForUpdate()->firstOrFail();
-
-            if ($room->status === 'maintenance') {
-                return "Room {$room->room_number} is under maintenance. Set it back to available before checking the guest in.";
-            }
-
-            $booking->update(['status' => Booking::CHECKED_IN, 'checked_in_at' => now()]);
-            $room->update(['status' => 'occupied']);   // keeps the dashboard + Rooms list in step
-
-            return null;
-        });
-
-        if ($blocked) {
-            return back()->with('error', $blocked);
+        // A room that is being cleaned or repaired cannot receive a guest yet
+        if (in_array($booking->room->status, ['cleaning', 'maintenance'], true)) {
+            return back()->with('error', "Room {$booking->room->room_number} is {$booking->room->status}. Check the guest in once housekeeping marks it clean.");
         }
+
+        $booking->update(['status' => Booking::CHECKED_IN, 'checked_in_at' => now()]);
 
         return back()->with('success', "{$booking->guest_name} checked in to Room {$booking->room->room_number}.");
     }
 
-    public function checkOut(Booking $booking): RedirectResponse
+    public function checkOut(Request $request, Booking $booking): RedirectResponse
     {
         Gate::authorize('checkOut', $booking);
 
@@ -206,18 +205,13 @@ class BookingController extends Controller
             return back()->with('error', 'Only a guest who is checked in can be checked out.');
         }
 
-        DB::transaction(function () use ($booking) {
-            $room = Room::whereKey($booking->room_id)->lockForUpdate()->firstOrFail();
-
+        // Check-out and "room needs cleaning" happen together, or not at all
+        DB::transaction(function () use ($booking, $request) {
             $booking->update(['status' => Booking::CHECKED_OUT, 'checked_out_at' => now()]);
-
-            // Free the room again (a room someone put under maintenance in the meantime stays that way).
-            if ($room->status === 'occupied') {
-                $room->update(['status' => 'available']);
-            }
+            app(HousekeepingService::class)->apply($booking->room, 'checked_out', $request->user(), $booking);
         });
 
-        return back()->with('success', "{$booking->guest_name} checked out of Room {$booking->room->room_number}.");
+        return back()->with('success', "{$booking->guest_name} checked out of Room {$booking->room->room_number}. The room is now marked for cleaning.");
     }
 
     /* =========================================================
@@ -266,8 +260,8 @@ class BookingController extends Controller
                 'check_in'    => $in,
                 'check_out'   => $out,
                 'nights'      => $nights,
-                // keeps the rate that was agreed when the booking was made
-                'total_price' => round($nights * (float) $booking->price_per_night, 2),
+                // keeps the rate AND the tax % that were agreed when the booking was made
+                ...$this->repriced($booking, $nights),
             ]);
         });
 
@@ -291,13 +285,7 @@ class BookingController extends Controller
     {
         Gate::authorize('delete', $booking);
 
-        DB::transaction(function () use ($booking) {
-            if ($booking->status === Booking::CHECKED_IN) {
-                Room::whereKey($booking->room_id)->where('status', 'occupied')->update(['status' => 'available']);
-            }
-
-            $booking->delete();
-        });
+        $booking->delete();
 
         return back()->with('success', 'Booking deleted.');
     }
@@ -305,6 +293,14 @@ class BookingController extends Controller
     /* =========================================================
      |  Helpers
      * ========================================================= */
+
+    /** New tax + total after the stay length changed, using the booking's own price and tax snapshot. */
+    private function repriced(Booking $booking, int $nights): array
+    {
+        $cost = Booking::priceBreakdown($nights, (float) $booking->price_per_night, (float) $booking->tax_rate);
+
+        return ['tax_amount' => $cost['tax_amount'], 'total_price' => $cost['total']];
+    }
 
     /** Shared validation rules for create + edit. */
     private function rules(bool $allowPast = false): array

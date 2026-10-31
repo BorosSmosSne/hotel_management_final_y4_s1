@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -25,6 +26,8 @@ class AuthController extends Controller
         // (so the message does not reveal which emails exist).
         $existing = User::where('email', $credentials['email'])->first();
         if ($existing && ! $existing->is_active && Hash::check($credentials['password'], $existing->password)) {
+            ActivityLogger::log('login_failed', "Deactivated account {$existing->email} tried to sign in", null, $existing->id);
+
             return back()->withErrors(['email' => 'Your account has been deactivated. Please contact an administrator.'])->onlyInput('email');
         }
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use App\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +16,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, LogsActivity;
 
     public const ROLE_ADMIN = 'admin';
     public const ROLE_STAFF = 'staff';
@@ -48,5 +49,17 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    /* ---------- Activity log ---------- */
+
+    protected function activitySubject(): string
+    {
+        return 'User #' . $this->getKey() . ' (' . $this->name . ')';
+    }
+
+    protected function activityCreatedNote(): string
+    {
+        return 'role ' . $this->role;
     }
 }

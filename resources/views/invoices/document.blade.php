@@ -90,8 +90,8 @@
                 <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.5px">Stay</div>
                 <div style="margin-top:3px">
                     Room <b>{{ $booking->room->room_number }}</b> · {{ $booking->room->roomType->type_name ?? 'N/A' }} · Floor {{ $booking->room->floor }}<br>
-                    Check-in: {{ $booking->check_in->format('d M Y') }}<br>
-                    Check-out: {{ $booking->check_out->format('d M Y') }}<br>
+                    Check-in: {{ $booking->check_in->format('d M Y') }} <span class="muted">from {{ \App\Support\HotelSettings::formatTime($hotel['checkin_time']) }}</span><br>
+                    Check-out: {{ $booking->check_out->format('d M Y') }} <span class="muted">by {{ \App\Support\HotelSettings::formatTime($hotel['checkout_time']) }}</span><br>
                     Guests: {{ $booking->guests }}
                 </div>
             </td>
@@ -106,7 +106,7 @@
                     <span class="muted">{{ $booking->check_in->format('d M') }} – {{ $booking->check_out->format('d M Y') }}</span></td>
                 <td class="right">{{ $booking->nights }}</td>
                 <td class="right">{{ $money($booking->price_per_night) }}</td>
-                <td class="right">{{ $money($booking->total_price) }}</td>
+                <td class="right">{{ $money($booking->subtotal()) }}</td>
             </tr>
         </tbody>
     </table>
@@ -130,6 +130,10 @@
             </td>
             <td style="width:48%; padding-right:0">
                 <table class="totals">
+                    @if ((float) $booking->tax_amount > 0)
+                        <tr><td class="muted">Subtotal</td><td class="right">{{ $money($booking->subtotal()) }}</td></tr>
+                        <tr><td class="muted">Tax ({{ rtrim(rtrim(number_format((float) $booking->tax_rate, 2), '0'), '.') }}%)</td><td class="right">{{ $money($booking->tax_amount) }}</td></tr>
+                    @endif
                     <tr><td class="muted">Total</td><td class="right">{{ $money($booking->total_price) }}</td></tr>
                     <tr><td class="muted">Paid</td><td class="right">{{ $money($paid) }}</td></tr>
                     <tr class="grand"><td>Balance due</td><td class="right">{{ $money($balance) }}</td></tr>

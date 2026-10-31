@@ -43,7 +43,7 @@
             <label for="statusFilter" class="sr-only">Status</label>
             <select id="statusFilter" class="field">
                 <option value="">All Status</option>
-                @foreach(['available', 'occupied', 'maintenance'] as $status)
+                @foreach(['available', 'occupied', 'cleaning', 'maintenance'] as $status)
                     <option value="{{ $status }}" {{ request('status') == $status ? 'selected' : '' }}>
                         {{ ucfirst($status) }}
                     </option>

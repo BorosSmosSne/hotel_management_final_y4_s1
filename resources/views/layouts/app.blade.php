@@ -11,12 +11,16 @@
 
 @auth
 @php
+    // Hotel identity from Admin > Settings (falls back to config/hotel.php)
+    $hotel     = \App\Support\HotelSettings::all();
+    $hotelLogo = \App\Support\HotelSettings::logoSrc();
     // Sidebar menu: label, route, active pattern, icon
     $browse = [
         ['Dashboard',  'dashboard',        'dashboard',    'grid'],
         ['Room Booking', 'bookings.index', 'bookings.*',   'calendar'],
         ['Rooms',      'rooms.index',      'rooms.*',      'door'],
         ['Room Types', 'room-types.index', 'room-types.*', 'bed'],
+        ['Housekeeping', 'housekeeping.index', 'housekeeping.*', 'sparkles'],
         ['Guests',     'guests.index',     'guests.*',     'id-card'],
         ['Payments',   'payments.index',   'payments.*',   'credit-card'],
     ];
@@ -28,6 +32,9 @@
         $quick[] = ['Add Room Type', 'room-types.create', 'plus'];
         // Admin only (the routes are also protected by role:admin)
         $browse[] = ['Users', 'users.index', 'users.*', 'users'];
+        $browse[] = ['Reports', 'reports.index', 'reports.*', 'chart'];
+        $browse[] = ['Activity Log', 'activity-log.index', 'activity-log.*', 'list'];
+        $browse[] = ['Settings', 'settings.edit', 'settings.*', 'cog'];
         $quick[]  = ['Add User', 'users.create', 'plus'];
     }
     $initials = \Illuminate\Support\Str::of(Auth::user()->name)->explode(' ')->filter()->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('');
@@ -54,9 +61,13 @@
        class="fixed inset-y-0 left-0 z-40 flex w-64 overflow-hidden whitespace-nowrap -translate-x-full flex-col bg-white shadow-xl shadow-primary/10 transition-[transform,width] duration-200 lg:translate-x-0 lg:shadow-none lg:ring-1 lg:ring-slate-900/5 lg:group-data-[collapsed=true]/sb:w-20">
 
     <div class="flex h-16 shrink-0 items-center justify-between px-5 lg:group-data-[collapsed=true]/sb:justify-center lg:group-data-[collapsed=true]/sb:gap-1 lg:group-data-[collapsed=true]/sb:px-0">
-        <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-2.5 whitespace-nowrap text-lg font-bold text-primary" title="Grand Hotel">
-            <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-white"><x-icon name="building" class="size-5" /></span>
-            <span class="{{ $hid }}">Grand Hotel</span>
+        <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-2.5 whitespace-nowrap text-lg font-bold text-primary" title="{{ $hotel['name'] }}">
+            @if ($hotelLogo)
+                <img src="{{ $hotelLogo }}" alt="" class="size-9 shrink-0 rounded-xl bg-white object-contain">
+            @else
+                <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-white"><x-icon name="building" class="size-5" /></span>
+            @endif
+            <span class="truncate {{ $hid }}">{{ $hotel['name'] }}</span>
         </a>
 
         {{-- mobile: close --}}
@@ -124,6 +135,10 @@
                        class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition {{ $ctr }} {{ $active ? 'bg-primary text-white shadow-md shadow-primary/25' : 'text-slate-600 hover:bg-tint hover:text-primary' }}">
                         <x-icon :name="$icon" class="size-5 shrink-0 {{ $active ? '' : 'text-slate-400 group-hover:text-primary' }}" />
                         <span class="truncate {{ $hid }}">{{ $label }}</span>
+                        {{-- rooms waiting to be cleaned --}}
+                        @if ($route === 'housekeeping.index' && ($sidebarCleaning ?? 0) > 0)
+                            <span class="ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $active ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-700' }} {{ $hid }}" title="{{ $sidebarCleaning }} rooms need cleaning">{{ $sidebarCleaning }}</span>
+                        @endif
                     </a>
                 </li>
                 @endif
@@ -171,8 +186,12 @@
         <button type="button" data-sidebar-toggle aria-expanded="false" aria-controls="sidebar" aria-label="Open menu"
                 class="icon-btn bg-tint text-primary"><x-icon name="menu" /></button>
         <a href="{{ route('dashboard') }}" class="flex items-center gap-2 font-bold text-primary">
-            <span class="grid size-8 place-items-center rounded-lg bg-primary text-white"><x-icon name="building" class="size-4" /></span>
-            Grand Hotel
+            @if ($hotelLogo)
+                <img src="{{ $hotelLogo }}" alt="" class="size-8 rounded-lg bg-white object-contain">
+            @else
+                <span class="grid size-8 place-items-center rounded-lg bg-primary text-white"><x-icon name="building" class="size-4" /></span>
+            @endif
+            {{ $hotel['name'] }}
         </a>
     </header>
 @endauth
@@ -202,8 +221,8 @@
 @auth
 <footer class="mt-8 border-t border-slate-200/70 bg-white">
     <div class="mx-auto flex max-w-none flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-slate-500 sm:px-6 lg:px-8">
-        <span><b class="text-primary">Grand Hotel</b> &middot; Hotel Management System</span>
-        <span>&copy; {{ date('Y') }} Grand Hotel. All rights reserved.</span>
+        <span><b class="text-primary">{{ $hotel['name'] }}</b> &middot; Hotel Management System</span>
+        <span>&copy; {{ date('Y') }} {{ $hotel['name'] }}. All rights reserved.</span>
     </div>
 </footer>
 

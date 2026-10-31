@@ -6,17 +6,20 @@
     // presentation only: donut gradient stops + chip colours
     $stopA = $availablePct;
     $stopO = $availablePct + $occupiedPct;
+    $stopC = $stopO + $cleaningPct;
     $donut = $totalRooms
-        ? "conic-gradient(#10b981 0 {$stopA}%, #ef4444 {$stopA}% {$stopO}%, #f59e0b {$stopO}% 100%)"
+        ? "conic-gradient(#10b981 0 {$stopA}%, #ef4444 {$stopA}% {$stopO}%, #0ea5e9 {$stopO}% {$stopC}%, #f59e0b {$stopC}% 100%)"
         : 'conic-gradient(#e2e8f0 0 100%)';
     $legend = [
         ['Available',   $available,   $availablePct,   'bg-emerald-500'],
         ['Occupied',    $occupied,    $occupiedPct,    'bg-red-500'],
+        ['Cleaning',    $cleaning,    $cleaningPct,    'bg-sky-500'],
         ['Maintenance', $maintenance, $maintenancePct, 'bg-amber-500'],
     ];
     $chips = [
         'available'   => ['bg-emerald-50 text-emerald-700', 'bg-emerald-500'],
         'occupied'    => ['bg-red-50 text-red-700', 'bg-red-500'],
+        'cleaning'    => ['bg-sky-50 text-sky-700', 'bg-sky-500'],
         'maintenance' => ['bg-amber-50 text-amber-700', 'bg-amber-500'],
     ];
 @endphp
@@ -44,7 +47,7 @@
 
         <div class="mt-6 grid place-items-center">
             <div class="grid size-52 place-items-center rounded-full" style="background: {{ $donut }}" role="img"
-                 aria-label="{{ $available }} available, {{ $occupied }} occupied, {{ $maintenance }} under maintenance">
+                 aria-label="{{ $available }} available, {{ $occupied }} occupied, {{ $cleaning }} being cleaned, {{ $maintenance }} under maintenance">
                 <div class="grid size-36 place-items-center rounded-full bg-white text-center">
                     <div>
                         <p class="text-4xl font-bold">{{ $totalRooms }}</p>
@@ -95,7 +98,7 @@
                                 </a>
                             </td>
                             <td class="px-6 py-4">{{ $room->roomType->type_name ?? 'N/A' }}</td>
-                            <td class="px-6 py-4 font-bold">${{ number_format($room->roomType->price_per_night ?? 0, 2) }}<span class="text-xs font-normal text-slate-500"> /night</span></td>
+                            <td class="px-6 py-4 font-bold">@money($room->roomType->price_per_night ?? 0)<span class="text-xs font-normal text-slate-500"> /night</span></td>
                             <td class="px-6 py-4"><span class="chip {{ $chip[0] }}"><span class="size-1.5 rounded-full {{ $chip[1] }}"></span>{{ ucfirst($room->status) }}</span></td>
                             <td class="px-6 py-4 text-slate-500">{{ $room->created_at?->diffForHumans() }}</td>
                         </tr>
@@ -123,7 +126,7 @@
             @php $share = $totalRooms ? round($type->room_count / $totalRooms * 100) : 0; @endphp
             <div>
                 <div class="mb-1.5 flex items-baseline justify-between text-sm">
-                    <span class="font-semibold">{{ $type->type_name }} <span class="font-normal text-slate-500">· ${{ number_format($type->price_per_night, 0) }}/night</span></span>
+                    <span class="font-semibold">{{ $type->type_name }} <span class="font-normal text-slate-500">· {{ \App\Support\HotelSettings::currency() }}{{ number_format($type->price_per_night, 0) }}/night</span></span>
                     <span class="font-semibold">{{ $type->room_count }} <span class="font-normal text-slate-500">rooms</span></span>
                 </div>
                 <div class="h-2.5 overflow-hidden rounded-full bg-tint" role="progressbar" aria-valuenow="{{ $share }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $type->type_name }} share of rooms">

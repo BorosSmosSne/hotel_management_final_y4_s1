@@ -46,7 +46,7 @@
                 <div>
                     <label for="status" class="label">Status <span class="text-red-600" aria-hidden="true">*</span></label>
                     <select id="status" name="status" class="field" required @error('status') aria-invalid="true" @enderror>
-                        @foreach(['available', 'occupied', 'maintenance'] as $status)
+                        @foreach(['available', 'occupied', 'cleaning', 'maintenance'] as $status)
                             <option value="{{ $status }}" {{ old('status') == $status ? 'selected' : '' }}>
                                 {{ ucfirst($status) }}
                             </option>

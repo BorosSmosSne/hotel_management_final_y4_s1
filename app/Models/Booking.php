@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
+use App\Support\HotelSettings;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Booking extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     public const CONFIRMED   = 'confirmed';
     public const CHECKED_IN  = 'checked_in';
@@ -21,7 +23,7 @@ class Booking extends Model
     protected $fillable = [
         'room_id', 'guest_id', 'created_by',
         'guest_name', 'phone', 'id_number', 'guests', 'notes',
-        'check_in', 'check_out', 'nights', 'price_per_night', 'total_price',
+        'check_in', 'check_out', 'nights', 'price_per_night', 'tax_rate', 'tax_amount', 'total_price',
         'status', 'checked_in_at', 'checked_out_at', 'cancelled_at',
     ];
 
@@ -31,6 +33,8 @@ class Booking extends Model
             'check_in'        => 'date',
             'check_out'       => 'date',
             'price_per_night' => 'decimal:2',
+            'tax_rate'        => 'decimal:2',
+            'tax_amount'      => 'decimal:2',
             'total_price'     => 'decimal:2',
             'checked_in_at'   => 'datetime',
             'checked_out_at'  => 'datetime',
@@ -125,6 +129,48 @@ class Booking extends Model
         }
 
         return $paid + 0.001 >= (float) $this->total_price ? 'paid' : 'partial';
+    }
+
+    /* ---------- Tax ---------- */
+
+    /**
+     * Room charge, tax and grand total for a stay. Tax is added on top of the room charge.
+     * total_price (what the guest pays) = subtotal + tax_amount.
+     *
+     * @return array{subtotal: float, tax_amount: float, total: float}
+     */
+    public static function priceBreakdown(int $nights, float $pricePerNight, float $taxRate): array
+    {
+        $subtotal = round($nights * $pricePerNight, 2);
+        $tax      = round($subtotal * $taxRate / 100, 2);
+
+        return ['subtotal' => $subtotal, 'tax_amount' => $tax, 'total' => round($subtotal + $tax, 2)];
+    }
+
+    /** Room charge before tax (older bookings have no tax, so this equals total_price). */
+    public function subtotal(): float
+    {
+        return round((float) $this->total_price - (float) $this->tax_amount, 2);
+    }
+
+    /* ---------- Activity log ---------- */
+
+    protected function activitySubject(): string
+    {
+        $room = $this->room?->room_number;
+
+        return 'Booking #' . $this->getKey() . ' (' . ($room ? 'Room ' . $room . ', ' : '') . $this->guest_name . ')';
+    }
+
+    protected function activityIgnored(): array
+    {
+        return ['checked_in_at', 'checked_out_at', 'cancelled_at'];   // the status change already says it
+    }
+
+    protected function activityCreatedNote(): string
+    {
+        return $this->check_in->format('d M Y') . ' to ' . $this->check_out->format('d M Y')
+            . ', total ' . HotelSettings::money($this->total_price);
     }
 
     /* ---------- Helpers ---------- */

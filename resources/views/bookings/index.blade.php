@@ -8,6 +8,7 @@
         'available'   => ['card' => 'bg-emerald-50/70 ring-emerald-200', 'chip' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-500'],
         'reserved'    => ['card' => 'bg-orange-50/70 ring-orange-200',   'chip' => 'bg-orange-100 text-orange-700',   'dot' => 'bg-orange-500'],
         'occupied'    => ['card' => 'bg-red-50/70 ring-red-200',         'chip' => 'bg-red-100 text-red-700',         'dot' => 'bg-red-500'],
+        'cleaning'    => ['card' => 'bg-slate-100 ring-slate-200',       'chip' => 'bg-slate-200 text-slate-600',     'dot' => 'bg-slate-400'],
         'maintenance' => ['card' => 'bg-slate-100 ring-slate-200',       'chip' => 'bg-slate-200 text-slate-600',     'dot' => 'bg-slate-400'],
     ];
     // booking record status -> chip
@@ -37,7 +38,7 @@
     <x-stat-card label="Available" :value="$counts['available'] ?? 0" :hint="'on ' . $date->format('d M Y')" icon="check" tone="green" />
     <x-stat-card label="Reserved" :value="$counts['reserved'] ?? 0" hint="booked, not checked in" icon="calendar" tone="orange" />
     <x-stat-card label="Occupied" :value="$counts['occupied'] ?? 0" hint="guest in the room" icon="users" tone="red" />
-    <x-stat-card label="Maintenance" :value="$counts['maintenance'] ?? 0" hint="cleaning / repair" icon="wrench" tone="slate" />
+    <x-stat-card label="Cleaning / Maintenance" :value="($counts['cleaning'] ?? 0) + ($counts['maintenance'] ?? 0)" hint="not bookable yet" icon="wrench" tone="slate" />
 </div>
 
 {{-- Filters (GET form: shareable URLs, works without JS; JS submits on change) --}}
@@ -53,7 +54,7 @@
             <label for="f_status" class="sr-only">Status</label>
             <select id="f_status" name="status" class="field" data-filter-auto>
                 <option value="">All Status</option>
-                @foreach (['available' => 'Available', 'reserved' => 'Reserved', 'occupied' => 'Occupied', 'maintenance' => 'Maintenance'] as $k => $v)
+                @foreach (['available' => 'Available', 'reserved' => 'Reserved', 'occupied' => 'Occupied', 'cleaning' => 'Cleaning', 'maintenance' => 'Maintenance'] as $k => $v)
                     <option value="{{ $k }}" @selected(request('status') === $k)>{{ $v }}</option>
                 @endforeach
             </select>
@@ -99,7 +100,7 @@
             </p>
         </div>
         <ul class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-slate-600" aria-label="Legend">
-            @foreach (['available' => 'Available', 'reserved' => 'Reserved', 'occupied' => 'Occupied', 'maintenance' => 'Maintenance'] as $k => $v)
+            @foreach (['available' => 'Available', 'reserved' => 'Reserved', 'occupied' => 'Occupied', 'cleaning' => 'Cleaning', 'maintenance' => 'Maintenance'] as $k => $v)
                 <li class="flex items-center gap-1.5"><span class="size-2.5 rounded-full {{ $look[$k]['dot'] }}"></span>{{ $v }}</li>
             @endforeach
         </ul>
@@ -115,8 +116,6 @@
                 $isAvailable = $state['key'] === 'available';
             @endphp
 
-            {{-- Wrapper keeps the card (a <button> when available) separate from the maintenance form below it --}}
-            <div class="flex flex-col gap-2 [&>:first-child]:flex-1">
             @if ($isAvailable)
                 {{-- Selectable card --}}
                 <button type="button" data-book-room
@@ -144,7 +143,7 @@
                     @if ($type)<span class="text-slate-500">· up to {{ $type->capacity }} {{ \Illuminate\Support\Str::plural('guest', $type->capacity) }}</span>@endif
                 </div>
 
-                <p class="mt-3 text-lg font-bold">${{ number_format($type->price_per_night ?? 0, 2) }}<span class="text-xs font-normal text-slate-500"> / night</span></p>
+                <p class="mt-3 text-lg font-bold">@money($type->price_per_night ?? 0)<span class="text-xs font-normal text-slate-500"> / night</span></p>
 
                 <div class="mt-3 border-t border-black/5 pt-3 text-xs">
                     @if ($isAvailable)
@@ -158,20 +157,6 @@
                 </div>
 
             @if ($isAvailable) </button> @else </div> @endif
-
-            @if (in_array($state['key'], ['available', 'maintenance'], true))
-                @php $inMaintenance = $state['key'] === 'maintenance'; @endphp
-                <form action="{{ route('rooms.maintenance', $room) }}" method="POST" data-loading-form>
-                    @csrf
-                    <input type="hidden" name="to" value="{{ $inMaintenance ? 'available' : 'maintenance' }}">
-                    <button type="submit"
-                            class="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition {{ $inMaintenance ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
-                        <x-icon :name="$inMaintenance ? 'check' : 'wrench'" class="size-3.5" />
-                        {{ $inMaintenance ? 'Back to available' : 'Set maintenance' }}
-                    </button>
-                </form>
-            @endif
-            </div>
         @empty
             <div class="col-span-full rounded-2xl bg-tint px-6 py-14 text-center text-slate-500">
                 <p class="font-medium text-ink">{{ $activeFloor !== null ? 'No rooms on this floor' : 'No rooms match these filters.' }}</p>
@@ -218,11 +203,11 @@
                             <span class="block text-xs text-slate-500">{{ $bk->nights }} {{ \Illuminate\Support\Str::plural('night', $bk->nights) }}</span>
                         </td>
                         <td class="px-6 py-4 text-slate-600">{{ $bk->guests }}</td>
-                        <td class="px-6 py-4 font-bold">${{ number_format($bk->total_price, 2) }}</td>
+                        <td class="px-6 py-4 font-bold">@money($bk->total_price)</td>
                         @php [$pLabel, $pChip] = $pLook[$bk->paymentStatus()]; @endphp
                         <td class="px-6 py-4">
                             <span class="chip {{ $pChip }}">{{ $pLabel }}</span>
-                            @if ($bk->balanceDue() > 0 && $bk->status !== 'cancelled')<span class="mt-1 block text-xs text-slate-500">Due ${{ number_format($bk->balanceDue(), 2) }}</span>@endif
+                            @if ($bk->balanceDue() > 0 && $bk->status !== 'cancelled')<span class="mt-1 block text-xs text-slate-500">Due @money($bk->balanceDue())</span>@endif
                         </td>
                         <td class="px-6 py-4"><span class="chip {{ $bChip }}"><span class="size-1.5 rounded-full {{ $bDot }}"></span>{{ $bLabel }}</span></td>
                         <td class="px-6 py-4">
@@ -313,7 +298,7 @@
                     <p class="text-sm text-slate-600">
                         <span data-bk-room-type>{{ $reopen?->roomType?->type_name }}</span> ·
                         Floor <span data-bk-room-floor>{{ $reopen?->floor }}</span> ·
-                        $<span data-bk-room-price>{{ number_format((float) ($reopen?->roomType?->price_per_night ?? 0), 2) }}</span> / night
+                        {{ \App\Support\HotelSettings::currency() }}<span data-bk-room-price>{{ number_format((float) ($reopen?->roomType?->price_per_night ?? 0), 2) }}</span> / night
                     </p>
                 </div>
             </div>
@@ -322,6 +307,13 @@
 
         <div class="p-6">
             <x-error-summary />
+            @php $taxRate = \App\Support\HotelSettings::taxRate(); @endphp
+            <p class="mb-5 flex items-start gap-2 rounded-xl bg-tint px-3 py-2.5 text-sm text-slate-600">
+                <x-icon name="calendar" class="mt-0.5 size-4 shrink-0 text-primary" />
+                <span>Check-in from <b class="text-ink">{{ \App\Support\HotelSettings::formatTime(\App\Support\HotelSettings::checkInTime()) }}</b>,
+                check-out by <b class="text-ink">{{ \App\Support\HotelSettings::formatTime(\App\Support\HotelSettings::checkOutTime()) }}</b>.
+                @if ($taxRate > 0)Tax of <b class="text-ink">{{ rtrim(rtrim(number_format($taxRate, 2), '0'), '.') }}%</b> is added to the room price.@endif</span>
+            </p>
             @include('bookings.partials.fields', ['booking' => null, 'idp' => 'n_', 'guestSearch' => true])
         </div>
 

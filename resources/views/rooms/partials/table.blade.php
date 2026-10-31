@@ -5,6 +5,7 @@
     $chips = [
         'available'   => ['bg-emerald-50 text-emerald-700', 'bg-emerald-500'],
         'occupied'    => ['bg-red-50 text-red-700', 'bg-red-500'],
+        'cleaning'    => ['bg-sky-50 text-sky-700', 'bg-sky-500'],
         'maintenance' => ['bg-amber-50 text-amber-700', 'bg-amber-500'],
     ];
 @endphp
@@ -35,7 +36,7 @@
                         </td>
                         <td class="px-6 py-4"><span class="chip bg-tint text-primary">{{ $room->roomType->type_name ?? 'N/A' }}</span></td>
                         <td class="px-6 py-4 text-slate-600">Floor {{ $room->floor }}</td>
-                        <td class="px-6 py-4"><span class="font-bold">${{ number_format($room->roomType->price_per_night ?? 0, 2) }}</span> <span class="text-xs text-slate-500">/ night</span></td>
+                        <td class="px-6 py-4"><span class="font-bold">@money($room->roomType->price_per_night ?? 0)</span> <span class="text-xs text-slate-500">/ night</span></td>
                         <td class="px-6 py-4">
                             <span class="chip {{ $chip[0] }}"><span class="size-1.5 rounded-full {{ $chip[1] }}"></span>{{ ucfirst($room->status) }}</span>
                         </td>

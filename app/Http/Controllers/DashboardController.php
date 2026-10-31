@@ -18,6 +18,7 @@ class DashboardController extends Controller
         $totalRooms  = array_sum($counts);
         $available   = $counts['available'] ?? 0;
         $occupied    = $counts['occupied'] ?? 0;
+        $cleaning    = $counts['cleaning'] ?? 0;
         $maintenance = $counts['maintenance'] ?? 0;
 
         $pct = fn (int $n) => $totalRooms ? round($n / $totalRooms * 100, 1) : 0;
@@ -26,9 +27,11 @@ class DashboardController extends Controller
             'totalRooms'     => $totalRooms,
             'available'      => $available,
             'occupied'       => $occupied,
+            'cleaning'       => $cleaning,
             'maintenance'    => $maintenance,
             'availablePct'   => $pct($available),
             'occupiedPct'    => $pct($occupied),
+            'cleaningPct'    => $pct($cleaning),
             'maintenancePct' => $pct($maintenance),
             'roomTypeCount'  => RoomType::count(),
             'recentRooms'    => Room::with('roomType')->latest()->take(5)->get(),

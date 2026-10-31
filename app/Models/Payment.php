@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
+use App\Support\HotelSettings;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     public const DEPOSIT = 'deposit';
     public const PAYMENT = 'payment';
@@ -62,5 +64,18 @@ class Payment extends Model
     public function typeLabel(): string
     {
         return self::TYPES[$this->type] ?? ucfirst($this->type);
+    }
+
+    /* ---------- Activity log ---------- */
+
+    protected function activitySubject(): string
+    {
+        return 'Payment #' . $this->getKey() . ' (' . $this->typeLabel() . ' ' . HotelSettings::money($this->amount)
+            . ', booking #' . $this->booking_id . ')';
+    }
+
+    protected function activityCreatedNote(): string
+    {
+        return $this->methodLabel() . ($this->reference ? ', ref ' . $this->reference : '');
     }
 }

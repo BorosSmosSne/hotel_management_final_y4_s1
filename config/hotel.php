@@ -1,9 +1,13 @@
 <?php
 
 /*
- | Hotel identity used on invoices (and later, the sidebar brand and price calculations).
- | Phase 4 ("Settings") will let an admin edit these values in the app; until then they
- | come from .env, e.g. HOTEL_NAME="Grand Hotel".
+ | Hotel defaults.
+ |
+ | Phase 4: the hotel's name, address, phone, email, currency, logo, tax % and default
+ | check-in / check-out times are now edited in the app (Admin > Settings) and stored in the
+ | `settings` table. App\Support\HotelSettings reads the table first and falls back to the values
+ | below for anything that has not been saved yet, so a fresh install still shows a sensible hotel.
+ | Once a value is saved in Settings, the matching HOTEL_* line in .env is no longer used.
  */
 return [
     'name'     => env('HOTEL_NAME', 'Grand Hotel'),
@@ -11,8 +15,13 @@ return [
     'phone'    => env('HOTEL_PHONE', ''),
     'email'    => env('HOTEL_EMAIL', ''),
     'currency' => env('HOTEL_CURRENCY', '$'),
-    // path relative to public/, e.g. "storage/logo.png" (leave null to show the hotel initial)
+    // path relative to public/, e.g. "uploads/logo.png" (leave null to show the hotel initial)
     'logo'     => env('HOTEL_LOGO'),
+
+    // Tax % added to the room price of NEW bookings (0 = no tax), and default times shown on bookings / invoices.
+    'tax_rate'      => (float) env('HOTEL_TAX_RATE', 0),
+    'checkin_time'  => env('HOTEL_CHECKIN_TIME', '14:00'),
+    'checkout_time' => env('HOTEL_CHECKOUT_TIME', '12:00'),
 
     // First administrator, created by `php artisan db:seed --class=AdminSeeder`.
     // Change these in .env (ADMIN_NAME / ADMIN_EMAIL / ADMIN_PASSWORD), then change the password after first login.

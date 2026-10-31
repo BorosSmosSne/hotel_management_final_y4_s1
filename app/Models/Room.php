@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Room extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'room_number',
@@ -43,6 +44,19 @@ class Room extends Model
             ->values();
     }
 
+    protected function casts(): array
+    {
+        return ['last_cleaned_at' => 'datetime'];
+    }
+
+    public function lastCleaner(){
+        return $this->belongsTo(User::class, 'last_cleaned_by');
+    }
+
+    public function housekeepingLogs(){
+        return $this->hasMany(HousekeepingLog::class);
+    }
+
     public function bookings(){
         return $this->hasMany(Booking::class);
     }
@@ -51,7 +65,7 @@ class Room extends Model
      * Effective status for the booking screen, as of one day.
      *
      * $current is the active booking whose stay covers that day (or null).
-     * Priority: maintenance > checked-in guest > manually "occupied" > reserved > available.
+     * Priority: maintenance > cleaning > checked-in guest > manually "occupied" > reserved > available.
      *
      * @return array{key:string,label:string,reason:?string}
      */
@@ -60,6 +74,11 @@ class Room extends Model
         if ($this->status === 'maintenance') {
             return ['key' => 'maintenance', 'label' => 'Maintenance',
                 'reason' => 'Under maintenance or cleaning - it cannot be booked until it is back in service.'];
+        }
+
+        if ($this->status === 'cleaning') {
+            return ['key' => 'cleaning', 'label' => 'Cleaning',
+                'reason' => 'Being cleaned - housekeeping must mark it clean before it can be booked.'];
         }
 
         if ($current && $current->status === Booking::CHECKED_IN) {
@@ -78,5 +97,23 @@ class Room extends Model
         }
 
         return ['key' => 'available', 'label' => 'Available', 'reason' => null];
+    }
+
+    /* ---------- Activity log ---------- */
+
+    protected function activitySubject(): string
+    {
+        return 'Room ' . $this->room_number;
+    }
+
+    /** Cleaning / maintenance changes are already recorded, with more detail, in Housekeeping's own log. */
+    protected function activityIgnored(): array
+    {
+        return ['status', 'last_cleaned_at', 'last_cleaned_by'];
+    }
+
+    protected function activityCreatedNote(): string
+    {
+        return 'floor ' . $this->floor;
     }
 }

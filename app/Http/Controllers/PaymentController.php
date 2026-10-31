@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\SavePaymentRequest;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Support\HotelSettings;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -62,8 +63,8 @@ class PaymentController extends Controller
         });
 
         return redirect()->route('bookings.show', $booking)->with('success', sprintf(
-            '%s of $%s recorded (%s).',
-            $payment->typeLabel(), number_format((float) $payment->amount, 2), $payment->methodLabel()
+            '%s of %s recorded (%s).',
+            $payment->typeLabel(), HotelSettings::money($payment->amount), $payment->methodLabel()
         ));
     }
 
@@ -144,7 +145,7 @@ class PaymentController extends Controller
         if ($type === Payment::REFUND) {
             if ($amount > $paid + 0.001) {
                 throw ValidationException::withMessages([
-                    'amount' => 'A refund cannot be more than the amount paid ($' . number_format($paid, 2) . ').',
+                    'amount' => 'A refund cannot be more than the amount paid (' . HotelSettings::money($paid) . ').',
                 ]);
             }
             return;
@@ -159,7 +160,7 @@ class PaymentController extends Controller
         $due = $booking->balanceDue($ignorePaymentId);
         if ($amount > $due + 0.001) {
             throw ValidationException::withMessages([
-                'amount' => 'The amount is more than the balance due ($' . number_format($due, 2) . ').',
+                'amount' => 'The amount is more than the balance due (' . HotelSettings::money($due) . ').',
             ]);
         }
     }

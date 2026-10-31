@@ -115,6 +115,8 @@
                 $isAvailable = $state['key'] === 'available';
             @endphp
 
+            {{-- Wrapper keeps the card (a <button> when available) separate from the maintenance form below it --}}
+            <div class="flex flex-col gap-2 [&>:first-child]:flex-1">
             @if ($isAvailable)
                 {{-- Selectable card --}}
                 <button type="button" data-book-room
@@ -156,6 +158,20 @@
                 </div>
 
             @if ($isAvailable) </button> @else </div> @endif
+
+            @if (in_array($state['key'], ['available', 'maintenance'], true))
+                @php $inMaintenance = $state['key'] === 'maintenance'; @endphp
+                <form action="{{ route('rooms.maintenance', $room) }}" method="POST" data-loading-form>
+                    @csrf
+                    <input type="hidden" name="to" value="{{ $inMaintenance ? 'available' : 'maintenance' }}">
+                    <button type="submit"
+                            class="flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition {{ $inMaintenance ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200' }}">
+                        <x-icon :name="$inMaintenance ? 'check' : 'wrench'" class="size-3.5" />
+                        {{ $inMaintenance ? 'Back to available' : 'Set maintenance' }}
+                    </button>
+                </form>
+            @endif
+            </div>
         @empty
             <div class="col-span-full rounded-2xl bg-tint px-6 py-14 text-center text-slate-500">
                 <p class="font-medium text-ink">{{ $activeFloor !== null ? 'No rooms on this floor' : 'No rooms match these filters.' }}</p>

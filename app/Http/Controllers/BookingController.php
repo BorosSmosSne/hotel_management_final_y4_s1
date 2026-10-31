@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\Room;
 use App\Models\RoomType;
+use App\Services\RoomStatusService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class BookingController extends Controller
     /* =========================================================
      |  Room Booking page
      * ========================================================= */
-    public function index(Request $request)
+    public function index(Request $request, RoomStatusService $status)
     {
         Gate::authorize('viewAny', Booking::class);
 
@@ -35,7 +36,7 @@ class BookingController extends Controller
 
         // Every room + the active booking (if any) that covers the chosen day.
         $rooms    = Room::with('roomType')->orderBy('floor')->orderBy('room_number')->get();
-        $current  = Booking::active()->covering($date)->get()->keyBy('room_id');
+        $current  = $status->bookingsOn($date);   // the booking that decides each room's status (RoomStatusService)
         $upcoming = Booking::active()
             ->where('check_in', '>', $date->toDateString())
             ->orderBy('check_in')->get()
@@ -43,12 +44,12 @@ class BookingController extends Controller
 
         $cards = $rooms->map(fn (Room $room) => [
             'room'  => $room,
-            'state' => $room->statusOn($current->get($room->id)),
+            'state' => $status->describe($room, $current->get($room->id)),
             'next'  => $upcoming->get($room->id),
         ]);
 
         // Status counts are for the whole hotel, before filters are applied.
-        $counts = $cards->countBy(fn ($c) => $c['state']['key'])->all();
+        $counts = $status->summarise($cards->pluck('state.key'));
 
         // Filters. Floor must be a whole number (sidebar + dropdown both send ?floor=N); anything else is ignored.
         $search = trim((string) $request->query('search', ''));
@@ -116,9 +117,8 @@ class BookingController extends Controller
             if ($room->status === 'maintenance') {
                 throw ValidationException::withMessages(['room_id' => "Room {$room->room_number} is under maintenance and cannot be booked."]);
             }
-            if ($room->status === 'occupied') {
-                throw ValidationException::withMessages(['room_id' => "Room {$room->room_number} is marked as occupied and cannot be booked."]);
-            }
+            // No 'occupied' check here: a guest checked in today must not stop a booking for later dates.
+            // assertCapacityAndFree() below rejects any stay that overlaps an active booking.
 
             $this->assertCapacityAndFree($room, (int) $data['guests'], $in, $out);
 
@@ -177,7 +177,23 @@ class BookingController extends Controller
             return back()->with('error', 'This guest can only be checked in during the stay (from the arrival date).');
         }
 
-        $booking->update(['status' => Booking::CHECKED_IN, 'checked_in_at' => now()]);
+        $blocked = DB::transaction(function () use ($booking) {
+            // Same row lock as store(), so check-in and a maintenance switch cannot race.
+            $room = Room::whereKey($booking->room_id)->lockForUpdate()->firstOrFail();
+
+            if ($room->status === 'maintenance') {
+                return "Room {$room->room_number} is under maintenance. Set it back to available before checking the guest in.";
+            }
+
+            $booking->update(['status' => Booking::CHECKED_IN, 'checked_in_at' => now()]);
+            $room->update(['status' => 'occupied']);   // keeps the dashboard + Rooms list in step
+
+            return null;
+        });
+
+        if ($blocked) {
+            return back()->with('error', $blocked);
+        }
 
         return back()->with('success', "{$booking->guest_name} checked in to Room {$booking->room->room_number}.");
     }
@@ -190,7 +206,16 @@ class BookingController extends Controller
             return back()->with('error', 'Only a guest who is checked in can be checked out.');
         }
 
-        $booking->update(['status' => Booking::CHECKED_OUT, 'checked_out_at' => now()]);
+        DB::transaction(function () use ($booking) {
+            $room = Room::whereKey($booking->room_id)->lockForUpdate()->firstOrFail();
+
+            $booking->update(['status' => Booking::CHECKED_OUT, 'checked_out_at' => now()]);
+
+            // Free the room again (a room someone put under maintenance in the meantime stays that way).
+            if ($room->status === 'occupied') {
+                $room->update(['status' => 'available']);
+            }
+        });
 
         return back()->with('success', "{$booking->guest_name} checked out of Room {$booking->room->room_number}.");
     }
@@ -266,7 +291,13 @@ class BookingController extends Controller
     {
         Gate::authorize('delete', $booking);
 
-        $booking->delete();
+        DB::transaction(function () use ($booking) {
+            if ($booking->status === Booking::CHECKED_IN) {
+                Room::whereKey($booking->room_id)->where('status', 'occupied')->update(['status' => 'available']);
+            }
+
+            $booking->delete();
+        });
 
         return back()->with('success', 'Booking deleted.');
     }

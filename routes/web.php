@@ -6,7 +6,9 @@ use App\Http\Controllers\GuestController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardStatsController;
 use App\Http\Controllers\RoomController;
+use App\Http\Controllers\RoomMaintenanceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoomTypeController;
 use App\Http\Controllers\UserController;
@@ -36,9 +38,13 @@ Route::post('/logout',[AuthController::class, 'logout'])
 Route::middleware(['auth', 'active'])->group(function(){
     // NEW
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    // Live numbers for the dashboard (polled with fetch every 15s)
+    Route::get('/dashboard/stats', DashboardStatsController::class)->name('dashboard.stats');
 
     Route::resource('room-types', RoomTypeController::class);
     Route::resource('rooms',RoomController::class);
+    // Front desk: put a room under maintenance / back to available (Admin + Staff)
+    Route::post('/rooms/{room}/maintenance', [RoomMaintenanceController::class, 'update'])->name('rooms.maintenance');
 
     // Room Booking. Role rules live in App\Policies\BookingPolicy and are enforced in the controller.
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');

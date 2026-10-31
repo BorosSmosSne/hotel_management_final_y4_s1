@@ -20,6 +20,11 @@ class BookingPolicy
         return true;
     }
 
+    public function view(User $user, Booking $booking): bool
+    {
+        return true;
+    }
+
     public function create(User $user): bool
     {
         return true;

@@ -1,0 +1,3 @@
+Merged: phase2_guests_payments + three_changes
+Delete from your project if present:  resources/views/auth/register.blade.php
+Then:  php artisan db:seed --class=AdminSeeder

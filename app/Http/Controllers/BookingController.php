@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\Guest;
 use App\Models\Room;
 use App\Models\RoomType;
 use Carbon\Carbon;
@@ -60,6 +61,7 @@ class BookingController extends Controller
             ->values();
 
         $bookings = Booking::with('room.roomType')
+            ->withPaymentTotals()
             ->latest('id')
             ->paginate(8, ['*'], 'bookings')
             ->withQueryString();
@@ -78,6 +80,18 @@ class BookingController extends Controller
     }
 
     /* =========================================================
+     |  Booking detail (totals, payments, record payment)
+     * ========================================================= */
+    public function show(Booking $booking)
+    {
+        Gate::authorize('view', $booking);
+
+        $booking->load(['room.roomType', 'guest', 'creator', 'payments.receiver']);
+
+        return view('bookings.show', compact('booking'));
+    }
+
+    /* =========================================================
      |  Create booking
      * ========================================================= */
     public function store(Request $request): RedirectResponse
@@ -85,7 +99,10 @@ class BookingController extends Controller
         Gate::authorize('create', Booking::class);
 
         $data = $request->validate(
-            $this->rules() + ['room_id' => ['required', 'exists:rooms,id']],
+            $this->rules() + [
+                'room_id'  => ['required', 'exists:rooms,id'],
+                'guest_id' => ['nullable', 'integer', 'exists:guests,id'],   // picked from "find existing guest"
+            ],
             $this->messages()
         );
 
@@ -105,15 +122,25 @@ class BookingController extends Controller
 
             $this->assertCapacityAndFree($room, (int) $data['guests'], $in, $out);
 
+            // Existing guest (picked, or matched by ID number) or a new one created inline.
+            // The booking keeps its own copy of name / phone / ID as a snapshot.
+            $guest = ! empty($data['guest_id'])
+                ? Guest::findOrFail($data['guest_id'])
+                : Guest::firstOrCreate(
+                    ['id_number' => $data['id_number']],
+                    ['name' => $data['guest_name'], 'phone' => $data['phone']]
+                );
+
             $nights = Booking::nightsBetween($in, $out);
             $price  = (float) $room->roomType->price_per_night;      // server-side price only
 
             return Booking::create([
                 'room_id'         => $room->id,
+                'guest_id'        => $guest->id,
                 'created_by'      => $request->user()->id,
-                'guest_name'      => $data['guest_name'],
-                'phone'           => $data['phone'],
-                'id_number'       => $data['id_number'],
+                'guest_name'      => $guest->name,
+                'phone'           => $guest->phone,
+                'id_number'       => $guest->id_number,
                 'guests'          => $data['guests'],
                 'notes'           => $data['notes'] ?? null,
                 'check_in'        => $in,

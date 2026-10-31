@@ -22,9 +22,10 @@ class DatabaseSeeder extends Seeder
         //     'email' => 'test@example.com',
         // ]);
         $this->call([
-            UserSeeder::class,
+            AdminSeeder::class,   // the first administrator (there is no public registration)
             RoomTypeSeeder::class,
             RoomSeeder::class,
+            GuestSeeder::class,
         ]);
     }
 }

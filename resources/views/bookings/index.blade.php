@@ -17,6 +17,12 @@
         'checked_out' => ['Checked out', 'bg-slate-100 text-slate-600',  'bg-slate-400'],
         'cancelled'   => ['Cancelled',   'bg-slate-100 text-slate-500',   'bg-slate-300'],
     ];
+    // payment status -> chip
+    $pLook = [
+        'unpaid'  => ['Unpaid',  'bg-red-50 text-red-700'],
+        'partial' => ['Partial', 'bg-amber-50 text-amber-700'],
+        'paid'    => ['Paid',    'bg-emerald-50 text-emerald-700'],
+    ];
     $isAdmin  = auth()->user()->isAdmin();
     $filtered = request()->hasAny(['search', 'status', 'room_type_id', 'floor']) || ! $date->isToday();
 
@@ -166,7 +172,7 @@
         <p class="text-sm text-slate-500">Latest bookings first. Check guests in and out here.</p>
     </div>
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[56rem] text-left text-sm">
+        <table class="w-full min-w-[64rem] text-left text-sm">
             <thead class="bg-tint text-xs font-semibold uppercase tracking-wider text-slate-600">
                 <tr>
                     <th scope="col" class="px-6 py-3">Guest</th>
@@ -174,6 +180,7 @@
                     <th scope="col" class="px-6 py-3">Stay</th>
                     <th scope="col" class="px-6 py-3">Guests</th>
                     <th scope="col" class="px-6 py-3">Total</th>
+                    <th scope="col" class="px-6 py-3">Payment</th>
                     <th scope="col" class="px-6 py-3">Status</th>
                     <th scope="col" class="px-6 py-3 text-right">Actions</th>
                 </tr>
@@ -183,7 +190,7 @@
                     @php [$bLabel, $bChip, $bDot] = $bLook[$bk->status] ?? [ucfirst($bk->status), 'bg-slate-100 text-slate-600', 'bg-slate-400']; @endphp
                     <tr class="border-t border-slate-100 transition hover:bg-tint/40">
                         <td class="px-6 py-4">
-                            <p class="font-semibold">{{ $bk->guest_name }}</p>
+                            <a href="{{ route('bookings.show', $bk) }}" class="font-semibold hover:text-primary">{{ $bk->guest_name }}</a>
                             <p class="text-xs text-slate-500">{{ $bk->phone }} · ID {{ $bk->id_number }}</p>
                         </td>
                         <td class="px-6 py-4">
@@ -196,10 +203,19 @@
                         </td>
                         <td class="px-6 py-4 text-slate-600">{{ $bk->guests }}</td>
                         <td class="px-6 py-4 font-bold">${{ number_format($bk->total_price, 2) }}</td>
+                        @php [$pLabel, $pChip] = $pLook[$bk->paymentStatus()]; @endphp
+                        <td class="px-6 py-4">
+                            <span class="chip {{ $pChip }}">{{ $pLabel }}</span>
+                            @if ($bk->balanceDue() > 0 && $bk->status !== 'cancelled')<span class="mt-1 block text-xs text-slate-500">Due ${{ number_format($bk->balanceDue(), 2) }}</span>@endif
+                        </td>
                         <td class="px-6 py-4"><span class="chip {{ $bChip }}"><span class="size-1.5 rounded-full {{ $bDot }}"></span>{{ $bLabel }}</span></td>
                         <td class="px-6 py-4">
                             <div class="flex items-center justify-end gap-2">
                                 {{-- Admin + staff --}}
+                                <a href="{{ route('bookings.show', $bk) }}" class="icon-btn bg-tint text-primary hover:bg-tint-2" aria-label="Open booking for {{ $bk->guest_name }}" title="Details"><x-icon name="eye" class="size-4" /></a>
+                                @if ($bk->status !== 'cancelled' && $bk->balanceDue() > 0)
+                                    <a href="{{ route('bookings.show', $bk) }}#record-payment" class="icon-btn bg-emerald-50 text-emerald-700 hover:bg-emerald-100" aria-label="Record payment for {{ $bk->guest_name }}" title="Record payment"><x-icon name="dollar" class="size-4" /></a>
+                                @endif
                                 @if ($bk->canCheckIn())
                                     <form action="{{ route('bookings.check-in', $bk) }}" method="POST" class="inline" data-loading-form>
                                         @csrf
@@ -245,7 +261,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="px-6 py-14 text-center text-slate-500">
+                    <tr><td colspan="8" class="px-6 py-14 text-center text-slate-500">
                         <p class="font-medium text-ink">No bookings yet.</p>
                         <p class="mt-1 text-sm">Click an available room above to create the first one.</p>
                     </td></tr>
@@ -290,7 +306,7 @@
 
         <div class="p-6">
             <x-error-summary />
-            @include('bookings.partials.fields', ['booking' => null, 'idp' => 'n_'])
+            @include('bookings.partials.fields', ['booking' => null, 'idp' => 'n_', 'guestSearch' => true])
         </div>
 
         <div class="flex justify-end gap-3 border-t border-slate-100 p-6">

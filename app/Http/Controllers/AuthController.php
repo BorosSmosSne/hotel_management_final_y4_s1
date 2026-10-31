@@ -9,28 +9,6 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function showRegister()
-    {
-        return view('auth.register');
-    }
-
-    public function register(Request $request)
-    {
-        $validated = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|string|email|max:255|unique:users,email',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
-
-        User::create([
-            'name'     => $validated['name'],
-            'email'    => $validated['email'],
-            'password' => Hash::make($validated['password']),
-        ]);
-
-        return redirect()->route('login')->with('success', 'Account created. Please login.');
-    }
-
     public function showLogin()
     {
         return view('auth.login');
@@ -43,7 +21,14 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        // Deactivated accounts cannot log in. Tell them why, but only if the password was right
+        // (so the message does not reveal which emails exist).
+        $existing = User::where('email', $credentials['email'])->first();
+        if ($existing && ! $existing->is_active && Hash::check($credentials['password'], $existing->password)) {
+            return back()->withErrors(['email' => 'Your account has been deactivated. Please contact an administrator.'])->onlyInput('email');
+        }
+
+        if (Auth::attempt($credentials + ['is_active' => true], $request->boolean('remember'))) {
             $request->session()->regenerate();
             return redirect()->intended(route('room-types.index'))
                 ->with('success', 'Welcome back, ' . Auth::user()->name . '!');

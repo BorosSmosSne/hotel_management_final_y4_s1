@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'role', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -25,6 +25,17 @@ class User extends Authenticatable
         return $this->role === self::ROLE_ADMIN;
     }
 
+    /** True when this user is an active admin and no OTHER active admin exists. */
+    public function isLastActiveAdmin(): bool
+    {
+        return $this->isAdmin()
+            && $this->is_active
+            && ! static::where('role', self::ROLE_ADMIN)
+                ->where('is_active', true)
+                ->whereKeyNot($this->getKey())
+                ->exists();
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -35,6 +46,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 }

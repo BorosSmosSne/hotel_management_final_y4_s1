@@ -41,7 +41,7 @@ class RoomController extends Controller
             'status'       => 'required|in:available,occupied,maintenance',
             'description'  => 'nullable|string',
             'room_type_id' => 'required|exists:room_types,id',
-        ]);
+        ], $this->messages());
 
         Room::create($validated);
 
@@ -62,7 +62,7 @@ class RoomController extends Controller
             'status'       => 'required|in:available,occupied,maintenance',
             'description'  => 'nullable|string',
             'room_type_id' => 'required|exists:room_types,id',
-        ]);
+        ], $this->messages());
 
         $room->update($validated);
 
@@ -73,5 +73,15 @@ class RoomController extends Controller
     {
         $room->delete();
         return redirect()->route('rooms.index')->with('success', 'Room deleted successfully.');
+    }
+
+    /** Clear messages for the floor field (0 = ground floor, negatives are rejected). */
+    private function messages(): array
+    {
+        return [
+            'floor.required' => 'Please enter the floor number.',
+            'floor.integer'  => 'The floor must be a whole number (0 or higher).',
+            'floor.min'      => 'The floor cannot be negative. Use 0 for the ground floor.',
+        ];
     }
 }

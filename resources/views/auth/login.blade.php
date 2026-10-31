@@ -65,16 +65,7 @@
 
                 <div>
                     <label for="password" class="label">Password</label>
-                    <div class="relative">
-                        <x-icon name="lock" class="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
-                        <input type="password" id="password" name="password" required autocomplete="current-password"
-                               class="field !px-12" @error('password') aria-invalid="true" @enderror>
-                        <button type="button" data-toggle-password="password" aria-label="Show password" aria-pressed="false"
-                                class="icon-btn absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:bg-tint-2">
-                            <span data-eye><x-icon name="eye" /></span>
-                            <span data-eye-off class="hidden"><x-icon name="eye-off" /></span>
-                        </button>
-                    </div>
+                    <x-password-input name="password" leading required autocomplete="current-password" />
                     <x-field-error name="password" />
                 </div>
 
@@ -86,7 +77,7 @@
                 <button class="btn btn-primary w-full !py-3.5 text-base">Login <x-icon name="arrow-left" class="size-5 rotate-180" /></button>
             </form>
 
-            <p class="mt-8 text-center text-sm text-slate-600">No account? <a href="{{ route('register') }}" class="font-semibold text-primary hover:underline">Register</a></p>
+            <p class="mt-8 text-center text-sm text-slate-500">Need an account? Ask an administrator to create one for you.</p>
         </div>
     </section>
 </div>

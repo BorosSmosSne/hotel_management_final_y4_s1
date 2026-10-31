@@ -17,12 +17,18 @@
         ['Room Booking', 'bookings.index', 'bookings.*',   'calendar'],
         ['Rooms',      'rooms.index',      'rooms.*',      'door'],
         ['Room Types', 'room-types.index', 'room-types.*', 'bed'],
+        ['Guests',     'guests.index',     'guests.*',     'id-card'],
+        ['Payments',   'payments.index',   'payments.*',   'credit-card'],
     ];
     $quick = [
         ['Add Room',      'rooms.create',      'plus'],
+        ['Add Guest',     'guests.create',     'plus'],
     ];
     if (Auth::user()->isAdmin()) {
         $quick[] = ['Add Room Type', 'room-types.create', 'plus'];
+        // Admin only (the routes are also protected by role:admin)
+        $browse[] = ['Users', 'users.index', 'users.*', 'users'];
+        $quick[]  = ['Add User', 'users.create', 'plus'];
     }
     $initials = \Illuminate\Support\Str::of(Auth::user()->name)->explode(' ')->filter()->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('');
 
@@ -140,13 +146,16 @@
     </nav>
 
     <div class="shrink-0 border-t border-slate-100 p-4">
-        <div class="flex items-center gap-3 {{ $ctr }}">
-            <span class="grid size-9 shrink-0 place-items-center rounded-full bg-tint-2 text-sm font-bold text-primary" aria-hidden="true" title="{{ Auth::user()->name }}">{{ $initials }}</span>
+        {{-- Opens My Profile (Admin + Staff) --}}
+        @php $onProfile = request()->routeIs('profile.*'); @endphp
+        <a href="{{ route('profile.edit') }}" title="My profile" @if($onProfile) aria-current="page" @endif
+           class="-m-2 flex items-center gap-3 rounded-xl p-2 transition {{ $ctr }} {{ $onProfile ? 'bg-tint' : 'hover:bg-tint' }}">
+            <span class="grid size-9 shrink-0 place-items-center rounded-full bg-tint-2 text-sm font-bold text-primary" aria-hidden="true">{{ $initials }}</span>
             <span class="min-w-0 flex-1 truncate text-sm font-semibold {{ $hid }}">{{ Auth::user()->name }}
                 <span class="block text-xs font-normal capitalize text-slate-500">{{ Auth::user()->role }}</span>
             </span>
-        </div>
-        <form action="{{ route('logout') }}" method="POST" class="mt-3">
+        </a>
+        <form action="{{ route('logout') }}" method="POST" class="mt-4">
             @csrf
             <button class="btn btn-soft w-full !py-2 lg:group-data-[collapsed=true]/sb:!px-0" title="Logout" aria-label="Logout"><x-icon name="logout" class="size-4" /><span class="{{ $hid }}">Logout</span></button>
         </form>

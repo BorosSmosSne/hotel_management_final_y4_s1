@@ -76,9 +76,37 @@ document.addEventListener('click', (e) => {
         const show = input.type === 'password';
         input.type = show ? 'text' : 'password';
         pw.setAttribute('aria-pressed', String(show));
+        pw.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
         pw.querySelector('[data-eye]')?.classList.toggle('hidden', show);
         pw.querySelector('[data-eye-off]')?.classList.toggle('hidden', !show);
     }
+});
+
+// 3b) Whole-number, non-negative inputs (Floor: 0 = ground floor). Blocks - + e . , and clamps pasted values.
+document.querySelectorAll('[data-floor-input]').forEach((input) => {
+    const clamp = () => {
+        if (input.value === '') return;
+        const n = Math.trunc(Number(input.value));
+        if (Number.isNaN(n)) { input.value = ''; return; }
+        const fixed = String(Math.max(0, n));
+        if (input.value !== fixed) input.value = fixed;
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (['-', '+', 'e', 'E', '.', ','].includes(e.key)) e.preventDefault();
+    });
+
+    input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        const n = parseInt(text.replace(/[^\d-]/g, ''), 10);   // "-3" becomes -3, then clamped to 0
+        if (Number.isNaN(n)) return;
+        input.value = String(Math.max(0, n));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    input.addEventListener('input', clamp);
+    input.addEventListener('blur', clamp);
 });
 
 // 4) Live preview: <span data-bind="field_name"> mirrors the form field with that name.
@@ -93,6 +121,7 @@ document.querySelectorAll('[data-preview-root]').forEach((root) => {
                 const opt = field.selectedOptions[0];
                 v = !field.value ? '' : el.dataset.bindData ? (opt?.dataset[el.dataset.bindData] ?? '') : opt.text.trim();
             }
+            if (field.type === 'number' && field.min !== '' && v !== '' && Number(v) < Number(field.min)) v = field.min;
             if (el.dataset.format === 'money' && v !== '' && !isNaN(v)) {
                 v = '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
@@ -177,9 +206,10 @@ if (bookingDialog) {
             bForm.querySelectorAll('[role="alert"]').forEach((el) => el.remove());
             bForm.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
 
+            bForm._resetGuest?.();
             bForm._refreshBooking();
             bookingDialog.showModal();
-            bForm.querySelector('input[name="guest_name"]').focus();
+            (bForm.querySelector('[data-guest-search]') || bForm.querySelector('input[name="guest_name"]')).focus();
             return;
         }
         if (e.target.closest('[data-bk-close]') || e.target === bookingDialog) bookingDialog.close();
@@ -240,3 +270,136 @@ if (filterForm) {
         }
     } catch (e) {}
 }
+
+
+// 6) Users page: reset-password dialog -------------------------------------
+const pwDialog = document.getElementById('passwordDialog');
+if (pwDialog) {
+    const pwForm = pwDialog.querySelector('form');
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-reset-password]');
+        if (btn) {
+            pwForm.action = btn.dataset.action;
+            pwForm.querySelector('[data-pw-user-id]').value = btn.dataset.userId;
+            pwDialog.querySelector('[data-pw-name]').textContent = btn.dataset.name;
+            pwForm.querySelectorAll('input[type="password"]').forEach((i) => { i.value = ''; });
+            pwForm.querySelectorAll('[role="alert"]').forEach((el) => el.remove());
+            pwDialog.showModal();
+            pwForm.querySelector('input[type="password"]').focus();
+            return;
+        }
+        if (e.target.closest('[data-pw-close]') || e.target === pwDialog) pwDialog.close();
+    });
+
+    // Server rejected the new password: re-open with the error message
+    if (pwDialog.hasAttribute('data-open')) pwDialog.showModal();
+}
+
+
+// 7) Booking form: "find existing guest" picker --------------------------------
+document.querySelectorAll('[data-guest-picker]').forEach((picker) => {
+    const form = picker.closest('form');
+    const input = picker.querySelector('[data-guest-search]');
+    const list = picker.querySelector('[data-guest-results]');
+    const idField = picker.querySelector('[data-guest-id]');
+    const banner = picker.querySelector('[data-guest-selected]');
+    const bannerText = picker.querySelector('[data-guest-selected-text]');
+    const hint = picker.querySelector('[data-guest-hint]');
+    const nameEl = form.querySelector('input[name="guest_name"]');
+    const phoneEl = form.querySelector('input[name="phone"]');
+    const docEl = form.querySelector('input[name="id_number"]');
+    const locked = [nameEl, phoneEl, docEl];
+    let timer, controller;
+
+    const closeList = () => { list.classList.add('hidden'); list.replaceChildren(); input.setAttribute('aria-expanded', 'false'); };
+
+    function lock(on) {
+        locked.forEach((el) => { el.readOnly = on; el.classList.toggle('opacity-70', on); });
+        banner.classList.toggle('hidden', !on);
+        banner.classList.toggle('flex', on);
+        hint?.classList.toggle('hidden', on);
+        input.closest('.relative').classList.toggle('hidden', on);
+    }
+
+    function pick(g) {
+        idField.value = g.id;
+        nameEl.value = g.name;
+        phoneEl.value = g.phone;
+        docEl.value = g.id_number;
+        bannerText.textContent = `${g.name} · ${g.phone} · ID ${g.id_number}`;
+        input.value = '';
+        closeList();
+        lock(true);
+    }
+
+    function clearGuest() {
+        idField.value = '';
+        locked.forEach((el) => { el.value = ''; });
+        lock(false);
+        nameEl.focus();
+    }
+
+    function render(items) {
+        list.replaceChildren();
+        if (!items.length) {
+            const li = document.createElement('li');
+            li.className = 'px-3 py-2 text-sm text-slate-500';
+            li.textContent = 'No guest found. Fill in the details below to add a new one.';
+            list.append(li);
+        }
+        items.forEach((g) => {
+            const li = document.createElement('li');
+            li.setAttribute('role', 'option');
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'flex w-full flex-col rounded-lg px-3 py-2 text-left text-sm hover:bg-tint focus:bg-tint focus:outline-none';
+            const n = document.createElement('span'); n.className = 'font-semibold'; n.textContent = g.name;
+            const d = document.createElement('span'); d.className = 'text-xs text-slate-500'; d.textContent = `${g.phone} · ID ${g.id_number}${g.nationality ? ' · ' + g.nationality : ''}`;
+            b.append(n, d);
+            b.addEventListener('click', () => pick(g));
+            li.append(b);
+            list.append(li);
+        });
+        list.classList.remove('hidden');
+        input.setAttribute('aria-expanded', 'true');
+    }
+
+    input.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (q.length < 2) { closeList(); return; }
+        timer = setTimeout(async () => {
+            controller?.abort();
+            controller = new AbortController();
+            try {
+                const res = await fetch(`${picker.dataset.searchUrl}?q=${encodeURIComponent(q)}`, {
+                    headers: { Accept: 'application/json' }, signal: controller.signal,
+                });
+                if (!res.ok) throw new Error('search failed');
+                render(await res.json());
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                list.replaceChildren();
+                const li = document.createElement('li');
+                li.className = 'px-3 py-2 text-sm text-red-600';
+                li.textContent = 'Could not search guests. You can still type the details below.';
+                list.append(li);
+                list.classList.remove('hidden');
+            }
+        }, 250);
+    });
+
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeList(); });
+    document.addEventListener('click', (e) => { if (!picker.contains(e.target)) closeList(); });
+    picker.querySelector('[data-guest-clear]').addEventListener('click', clearGuest);
+
+    // called when the booking modal opens for another room
+    form._resetGuest = () => { idField.value = ''; input.value = ''; closeList(); lock(false); };
+
+    // re-opened after a server error with a guest already chosen: keep them locked in
+    if (idField.value && nameEl.value) {
+        bannerText.textContent = `${nameEl.value} · ${phoneEl.value} · ID ${docEl.value}`;
+        lock(true);
+    }
+});

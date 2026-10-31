@@ -3,6 +3,25 @@
 @php $b = $booking ?? null; @endphp
 
 <div class="grid gap-5 sm:grid-cols-2">
+    @if (! empty($guestSearch))
+        {{-- Find an existing guest, or just fill the fields below to create a new one --}}
+        <div class="sm:col-span-2" data-guest-picker data-search-url="{{ route('guests.search') }}">
+            <label for="{{ $idp }}guest_search" class="label">Find existing guest</label>
+            <div class="relative">
+                <x-icon name="search" class="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
+                <input type="text" id="{{ $idp }}guest_search" class="field !pl-12" placeholder="Search name, phone or ID number…"
+                       autocomplete="off" role="combobox" aria-expanded="false" aria-controls="{{ $idp }}guest_results" data-guest-search>
+                <ul id="{{ $idp }}guest_results" role="listbox" class="absolute z-20 mt-1 hidden max-h-60 w-full overflow-y-auto rounded-xl bg-white p-1 shadow-lg ring-1 ring-slate-900/10" data-guest-results></ul>
+            </div>
+            <input type="hidden" name="guest_id" value="{{ old('guest_id') }}" data-guest-id>
+            <div class="mt-2 hidden items-center justify-between gap-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800" data-guest-selected>
+                <span class="min-w-0 truncate" data-guest-selected-text></span>
+                <button type="button" class="shrink-0 font-semibold underline" data-guest-clear>Use a different guest</button>
+            </div>
+            <p class="hint" data-guest-hint>Not found? Fill in the details below and a new guest is saved automatically.</p>
+        </div>
+    @endif
+
     <div class="sm:col-span-2">
         <label for="{{ $idp }}guest_name" class="label">Customer name <span class="text-red-600" aria-hidden="true">*</span></label>
         <input type="text" id="{{ $idp }}guest_name" name="guest_name" class="field" required maxlength="255"

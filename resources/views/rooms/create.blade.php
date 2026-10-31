@@ -24,7 +24,8 @@
                 </div>
                 <div>
                     <label for="floor" class="label">Floor <span class="text-red-600" aria-hidden="true">*</span></label>
-                    <input type="number" id="floor" name="floor" class="field" value="{{ old('floor') }}" required @error('floor') aria-invalid="true" @enderror>
+                    <input type="number" id="floor" name="floor" class="field" value="{{ old('floor') }}" required min="0" step="1" inputmode="numeric" data-floor-input aria-describedby="floor-hint" @error('floor') aria-invalid="true" @enderror>
+                    <p id="floor-hint" class="hint">Whole number from 0 up. Use 0 for the ground floor.</p>
                     <x-field-error name="floor" />
                 </div>
             </div>
